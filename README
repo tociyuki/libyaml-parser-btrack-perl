@@ -1,0 +1,27 @@
+YAML-Parser-Btrack version 0.001
+
+A backtrack parser of YAML 1.2 compliant without memorize futures.
+This is the practical implementation for to study the YAML 1.2 grammar.
+Highly experimetal!
+Do not use in productions!
+
+INSTALLATION
+
+To install this module, run the following commands:
+
+	perl Makefile.PL
+	make
+	make test
+	make install
+
+
+DEPENDENCIES
+
+None.
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2012, MIZUTANI Tociyuki
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
