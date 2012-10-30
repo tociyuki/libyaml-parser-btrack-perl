@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Carp;
 use Test::More;
-use Test::Exception;
+# use Test::Exception;
 use YAML::Parser::Btrack;
 
 BEGIN { require 't/behaviour.pm' and Test::Behaviour->import }

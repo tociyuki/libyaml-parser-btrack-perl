@@ -1,9 +1,23 @@
 Changes
+ignore.txt
 lib/YAML/Parser/Btrack.pm
 Makefile.PL
 MANIFEST			This list of files
 README
 t/00.load.t
+t/01.derivs.t
+t/02.spaces.t
+t/03.properties.t
+t/04.flow-scalar.t
+t/05.flow-sequence.t
+t/06.flow-mapping.t
+t/07.flow-nodes.t
+t/10.block-scalar.t
+t/11.block-sequence.t
+t/12.block-mapping.t
+t/13.block-nodes.t
+t/20.stream.t
+t/behaviour.pm
 t/perlcritic.t
 t/pod-coverage.t
 t/pod.t
