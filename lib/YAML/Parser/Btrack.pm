@@ -904,7 +904,7 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memorized)
 
 =head1 SYNOPSIS
 
-    use YAML::Parser::Btrack qw(derivs l_yaml_stream)
+    use YAML::Parser::Btrack qw(derivs l_yaml_stream);
     use Data::Dumper;
 
     my $derivs = derivs(<<'EOS');
