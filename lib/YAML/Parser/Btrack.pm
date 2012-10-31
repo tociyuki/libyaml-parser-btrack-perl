@@ -2,12 +2,15 @@ package YAML::Parser::Btrack;
 use strict;
 use warnings;
 use Carp;
+use parent qw(Exporter);
 
 our $VERSION = '0.001';
 # $Id$
 
+our @EXPORT_OK = qw(derivs match l_yaml_stream s_l__block_node ns_flow_node);
+
 # CAUTION: This module is highly EXPERIMENTAL!
-# do not use productions.
+# do not use for any productions.
 
 # Pieces of the backtrak parser.
 
@@ -52,7 +55,7 @@ sub match {
     return;
 }
 
-# on end of file, returns derivs;
+# at end of file and returns derivs.
 sub end_of_file {
     my($derivs) = @_;
     return wantarray ? ($derivs, q()) : 1
@@ -64,7 +67,7 @@ sub end_of_file {
 #
 #   see http://www.yaml.org/spec/1.2/spec.html
 #
-# the numbers as [39] correspond to production number in the Specification.
+# the notation '[39]' correspond to production number in the Specification.
 
 # [39] ns-uri-char
 my $URICHAR = qr{(?:%[[:xdigit:]]{2}|[0-9A-Za-z\-\#;/?:\@&=+\$,_.!~*'()\[\]])}msx;
@@ -104,7 +107,6 @@ my $S_L_COMMENTS = qr{
     |   \z)
 }msx;
 
-# Regexp stub function for tests.
 sub s_l_comments {
     my($derivs) = @_;
     my($derivs1, $t1) = match($derivs, qr/($S_L_COMMENTS)/mosx) or return;
@@ -504,8 +506,8 @@ sub ns_flow_seq_entry {
          : [@{$prop}, $key || ['e-scalar']];
     RULE: {
         my $colon = $c eq 'flow-in' || $c eq 'flow-key'
-            ? qr/[:](?=[ \t\r\n,\[\]\{\}])/msx
-            : qr/[:](?=[ \t\r\n])/msx;
+            ? qr/[:](?=[ \t\r\n,\[\]\{\}])/omsx
+            : qr/[:](?=[ \t\r\n])/omsx;
         my $derivs5 = $derivs3 || $derivs4 || $derivs;
         my $derivs6 = s_separate($derivs5, $n, $c) || $derivs5;
         my $derivs7 = match($derivs6, $derivs4 ? ':' : $colon) or last;
@@ -578,8 +580,8 @@ sub ns_flow_map_implicit_entry {
          : [@{$prop}, $key || ['e-scalar']];
     RULE: {
         my $colon = $c eq 'flow-in' || $c eq 'flow-key'
-            ? qr/[:](?=[ \t\r\n,\[\]\{\}])/msx
-            : qr/[:](?=[ \t\r\n])/msx;
+            ? qr/[:](?=[ \t\r\n,\[\]\{\}])/omsx
+            : qr/[:](?=[ \t\r\n])/omsx;
         my $derivs5 = $derivs3 || $derivs4 || $derivs;
         my $derivs6 = s_separate($derivs5, $n, $c) || $derivs5;
         my $derivs7 = match($derivs6, $derivs4 ? ':' : $colon) or last;
@@ -631,13 +633,13 @@ sub c_l__block_scalar {
     my $indentation = defined $p[1] ? $p[1] : $p[4];
     my $chomp = $p[2] || $p[3] || q();
     if (! defined $indentation) {
-        my(undef, $w) = match($derivs1, qr/(?:[ \t]*\n)*([ ]*)[^ \n]/msx);
+        my(undef, $w) = match($derivs1, qr/(?:[ \t]*\n)*([ ]*)[^ \n]/omsx);
         $w ||= q();
         $indentation = (length $w) >= $n ? (length $w) - $n : 0; 
     }
     $n += $indentation;
     my($derivs2, $s) = match($derivs1, qr{
-        ((?:(?!(?:---|[.][.][.]))(?:[ ]{$n}[\p{Graph} \t]+\n|[ ]*\n))*)
+        ((?:(?!(?:^---|^[.][.][.]))(?:[ ]{$n}[\p{Graph} \t]+\n|[ ]*\n))*) 
     }msx) or return;
     my $derivs3 = s_l_comments($derivs2) || $derivs2;
     $n > 0 and $s =~ s/^[ ]{0,$n}//gmsx;
@@ -656,7 +658,7 @@ sub c_l__block_scalar {
 sub l__block_sequence {
     my($derivs, $n) = @_;
     my @seq;
-    my($derivs1, $spaces) = match($derivs, qr/([ ]*)(?=[-][ \t\n])/msx) or return;
+    my($derivs1, $spaces) = match($derivs, qr/([ ]*)(?=[-][ \t\n])/omsx) or return;
     my $n1 = length $spaces;
     $n1 - $n > 0 or return;
     my $lex = qr/[ ]{$n1}-(?=[ \t\n])/msx;
@@ -675,7 +677,7 @@ sub l__block_sequence {
 sub ns_l_compact_sequence {
     my($derivs, $n) = @_;
     my @seq;
-    my $derivs1 = match($derivs, qr/[-](?=[ \t\\n])/msx) or return;
+    my $derivs1 = match($derivs, qr/[-](?=[ \t\\n])/omsx) or return;
     my($derivs2, $entry) = s_l__block_indented($derivs1, $n, 'block-in') or return;
     push @seq, $entry;
     my $lex = qr/[ ]{$n}[-](?=[ \t\\n])/msx;
@@ -691,7 +693,7 @@ sub ns_l_compact_sequence {
 sub s_l__block_indented {
     my($derivs, $n, $c) = @_;
     RULE: {
-        my($derivs1, $spaces) = match($derivs, qr/([ ]+)/msx) or last;
+        my($derivs1, $spaces) = match($derivs, qr/([ ]+)/omsx) or last;
         my $m = length $spaces;
         my($derivs2, $entry) = ns_l_compact_sequence($derivs1, $n + 1 + $m);
         return ($derivs2, $entry) if $entry;
@@ -713,7 +715,7 @@ sub s_l__block_indented {
 sub l__block_mapping {
     my($derivs, $n) = @_;
     my @map;
-    my($derivs1, $spaces) = match($derivs, qr/([ ]*)/msx) or return;
+    my($derivs1, $spaces) = match($derivs, qr/([ ]*)/omsx) or return;
     my $n1 = length $spaces;
     $n1 - $n > 0 or return;
     my $indent = q( ) x $n1;
@@ -759,7 +761,7 @@ sub ns_l_block_map_entry {
              : ! $prop && $key ? $key
              : [@{$prop}, $key || ['e-scalar']];
         if ($derivs3) {
-            $derivs3 = match($derivs3, qr/[ ]+/msx) || $derivs3;
+            $derivs3 = match($derivs3, qr/[ ]+/omsx) || $derivs3;
         }
         else {
             $derivs3 = $derivs;
@@ -831,7 +833,7 @@ sub l_yaml_stream {
     my($derivs) = @_;
     my @stream;
     my $but_first = 0;
-    my $suffix = qr/(?:[.][.][.]$S_L_COMMENTS)+/msx;
+    my $suffix = qr/(?:[.][.][.]$S_L_COMMENTS)+/omsx;
     my $derivs1 = $derivs;
     while (! end_of_file($derivs1)) {
         if ($but_first++) {
@@ -866,7 +868,7 @@ sub l_yaml_stream {
                 push @stream, ['l-bare-document', $node];
             }
             else {
-                $derivs2 = match($derivs1, qr/.*?(?=(?:^---|^[.][.][.]|\z))/msx)
+                $derivs2 = match($derivs1, qr/.*?(?=(?:^---|^[.][.][.]|\z))/omsx)
                     or croak 'SyntaxError: document end marker not found.'
             }
             $derivs1 = $derivs2;
@@ -894,7 +896,7 @@ __END__
 
 =head1 NAME
 
-YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memoraized)
+YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memorized)
 
 =head1 VERSION
 
@@ -902,9 +904,10 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memoraized)
 
 =head1 SYNOPSIS
 
-    use YAML::Parser::Btrack;
+    use YAML::Parser::Btrack qw(derivs l_yaml_stream)
+    use Data::Dumper;
 
-    my $parsing_tree = YAML::Parser::Btrack::l_yaml_stream(<<'EOS');
+    my $derivs = derivs(<<'EOS');
     %YAML 1.2
     ---
     - - a
@@ -912,6 +915,8 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memoraized)
     -
       C : c
     EOS
+    my($derivs1, $parsing_tree) = YAML::Parser::Btrack::l_yaml_stream($derivs);
+    print Data::Dumper->new([$parsing_tree])->Terse(1)->Useqq(1)->Indent(1)->Dump;
 
 =head1 DESCRIPTION
 
@@ -931,7 +936,7 @@ Copy a derivs arrayref and set new position.
 
 =item C<< match($derivs, $phrase) >>
 
-Returns next positioned $derivs and captured strings when it match $phrase.
+Returns next positioned $derivs and captured strings when it matchs $phrase.
 $phrase is a $substr or a regexp.
 
 =item C<< end_of_file($derivs) >>
@@ -966,7 +971,7 @@ The production l-directive included s-l-comments.
 
 to
 
-    ['l-directive', 'YAML', '1.2']
+    ['ns-yaml-directive', 'YAML', '1.2']
 
 =item C<< c_ns_properties >>
 
@@ -1173,7 +1178,7 @@ or
 
 to
 
-    ['c-l+folded', qq(folded text)]
+    ['c-l+folded', qq(folded text\n)]
 
 =item C<< l__block_sequence >>
 
@@ -1185,7 +1190,7 @@ The production l+block-sequence.
     - entry
     - - compact
       - sequence
-    - compact: mapping
+    - compact implicit: mapping
     - ? compact explicit
       : mapping
 
@@ -1199,7 +1204,7 @@ to
             ['ns-plain', 'compact'],
             ['ns-plain', 'sequence']],
         ['ns-l-compact-mapping',
-            ['ns-plain', 'compact'],
+            ['ns-plain', 'compact implicit'],
             ['ns-plain', 'mapping']],
         ['ns-l-compact-mapping',
             ['ns-plain', 'compact explicit'],
@@ -1255,7 +1260,7 @@ The production s-l+block-node.
     ? explicit
     : mapping
     implicit: mapping
-    *flow_anchor
+    *flow-anchor
     flow plain text
     "flow double quoted"
     'flow single quoted'
@@ -1297,6 +1302,24 @@ The production l-yaml-stream.
     %YAML 1.2
     ---
     directive document
+
+to
+
+    ['l-yaml-stream',
+        ['l-bare-document',
+            ['ns-plain', 'bare document']],
+        ['l-directive-document',
+            ['ns-yaml-directive', 'YAML', '1.2'],
+            ['c-l+folded', qq(directive document\n)]],
+        ['l-explicit-document',
+            ['c-single-quoted', 'explicit document']],
+        ['l-explicit-document',
+            ['ns-plain', 'explicit document']],
+        ['l-bare-document',
+            ['ns-plain', 'bare document']],
+        ['l-directive-document',
+            ['ns-yaml-directive', 'YAML', '1.2'],
+            ['ns-plain', qq(directive document)]] ]
 
 =back
 

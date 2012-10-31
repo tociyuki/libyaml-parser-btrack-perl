@@ -7,7 +7,7 @@ use YAML::Parser::Btrack;
 
 BEGIN { require 't/behaviour.pm' and Test::Behaviour->import }
 
-plan tests => 17;
+plan tests => 19;
 
 *derivs = \&YAML::Parser::Btrack::derivs;
 *match = \&YAML::Parser::Btrack::match;
@@ -359,6 +359,58 @@ sub strip {
         is_deeply [strip c_l__block_scalar($s3, 0)],
             [
                 strip $s3end,
+                ['c-l+folded', qq(folded text\n\n)],
+            ], spec;
+
+    it 'should fold lines and keep trail line feeds again.';
+
+        my $s3a = derivs(
+              qq(>+\n)
+            . qq( folded\n)
+            . qq( text\n)
+            . qq(\n)
+            . qq(\n)
+            . qq(---\n),
+        );
+        my $s3aend = match($s3a,
+              qq(>+\n)
+            . qq( folded\n)
+            . qq( text\n)
+            . qq(\n)
+            . qq(\n)
+        );
+        is_deeply [strip c_l__block_scalar($s3a, 0)],
+            [
+                strip $s3aend,
+                ['c-l+folded', qq(folded text\n\n\n)],
+            ], spec;
+
+    it 'should fold lines and keep trail line feeds more again.';
+
+        my $s3b = derivs(
+              qq(>+\n)
+            . qq( folded\n)
+            . qq( text\n)
+            . qq(\n)
+            . qq(# keep\n)
+            . qq(   \n)
+            . qq(    # comment\n)
+            . qq(\n)
+            . qq(---\n),
+        );
+        my $s3bend = match($s3b,
+              qq(>+\n)
+            . qq( folded\n)
+            . qq( text\n)
+            . qq(\n)
+            . qq(# keep\n)
+            . qq(   \n)
+            . qq(    # comment\n)
+            . qq(\n)
+        );
+        is_deeply [strip c_l__block_scalar($s3b, 0)],
+            [
+                strip $s3bend,
                 ['c-l+folded', qq(folded text\n\n)],
             ], spec;
 

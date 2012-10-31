@@ -7,7 +7,7 @@ use YAML::Parser::Btrack;
 
 BEGIN { require 't/behaviour.pm' and Test::Behaviour->import }
 
-plan tests => 11;
+plan tests => 12;
 
 *derivs = \&YAML::Parser::Btrack::derivs;
 *match = \&YAML::Parser::Btrack::match;
@@ -342,6 +342,44 @@ sub strip {
                             ['ns-plain', 'earth'], ['ns-plain', 'blue'], ],
                         ['ns-l-compact-mapping',
                             ['ns-plain', 'moon'], ['ns-plain', 'white'], ], ], ],
+            ], spec;
+}
+
+{
+    describe 'Block Implicit Key';
+
+    it 'should allow backtracking to multi-lines plain on fails.';
+
+        my $s1 = derivs(
+              qq(- not compact implicit key\n)
+            . qq(  but multi-lines\n)
+            . qq(  plain text. \n)
+            . qq(-\n)
+            . qq(  not block implicit key\n)
+            . qq(  but multi-lines\n)
+            . qq(  plain text. \n)
+            . qq(---\n),
+        );
+        my $s1end = match($s1,
+              qq(- not compact implicit key\n)
+            . qq(  but multi-lines\n)
+            . qq(  plain text. \n)
+            . qq(-\n)
+            . qq(  not block implicit key\n)
+            . qq(  but multi-lines\n)
+            . qq(  plain text. \n)
+        );
+
+        is_deeply [strip l__block_sequence($s1, -1, 'block-in')],
+            [
+                strip $s1end,
+                ['l+block-sequence',
+                    ['ns-plain', qq(not compact implicit key )
+                               . qq(but multi-lines )
+                               . qq(plain text.)],
+                    ['ns-plain', qq(not block implicit key )
+                               . qq(but multi-lines )
+                               . qq(plain text.)], ],
             ], spec;
 }
 
