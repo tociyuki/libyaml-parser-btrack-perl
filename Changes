@@ -1,5 +1,8 @@
 Revision history for YAML-Parser-Btrack
 
+0.002 Thu Nov  1 12:49:37 2012
+    * code refactering.
+
 0.001 Thu Oct 25 10:04:58 2012
     + Initial release.
 

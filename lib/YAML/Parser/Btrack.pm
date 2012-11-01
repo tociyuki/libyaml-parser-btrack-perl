@@ -2,12 +2,15 @@ package YAML::Parser::Btrack;
 use strict;
 use warnings;
 use Carp;
-use parent qw(Exporter);
+use Exporter;
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 # $Id$
 
-our @EXPORT_OK = qw(derivs match l_yaml_stream s_l__block_node ns_flow_node);
+our @ISA = qw(Exporter);
+our @EXPORT_OK = qw(
+    derivs match end_of_file l_yaml_stream s_l__block_node ns_flow_node
+);
 
 # CAUTION: This module is highly EXPERIMENTAL!
 # do not use for any productions.
@@ -16,7 +19,7 @@ our @EXPORT_OK = qw(derivs match l_yaml_stream s_l__block_node ns_flow_node);
 
 # derivs is an immutable set of source string and parsing position.
 #
-#   see first simple backtrack parser explained in the paper:
+#   see the first simple backtrack parser explained in the paper:
 #     http://pdos.csail.mit.edu/~baford/packrat/icfp02/
 #
 # usage:
@@ -67,8 +70,6 @@ sub end_of_file {
 #
 #   see http://www.yaml.org/spec/1.2/spec.html
 #
-# the notation '[39]' correspond to production number in the Specification.
-
 # [39] ns-uri-char
 my $URICHAR = qr{(?:%[[:xdigit:]]{2}|[0-9A-Za-z\-\#;/?:\@&=+\$,_.!~*'()\[\]])}msx;
 # [40] ns-tag-char
@@ -220,8 +221,6 @@ sub c_ns_anchor_property {
     return ($derivs1, ['c-ns-anchor-property', $anchor]);
 }
 
-# node layout   [!!str nodename, !!maybe:seq properties, content]
-
 # 7.1. Alias Nodes
 #
 # [104] c-ns-alias-node
@@ -234,43 +233,40 @@ sub c_ns_alias_node {
 
 # 7.3. Flow Scalar Styles
 #
-# [109] c-double-quoted(n,c)
-sub c_double_quoted {
-    my($derivs, $n, $c) = @_;
-    my($derivs1) = match($derivs, q(")) or return;
-    my $product = $c eq 'block-key' || $c eq 'flow-key'
-        ? \&nb_double_one_line
-        : \&nb_double_multi_line;
-    my($derivs2, $text) = $product->($derivs1, $n) or return;
-    my($derivs3) = match($derivs2, q(")) or return;
-    return ($derivs3, ['c-double-quoted', decode_double_text($text)]);
-}
-
 # [111] nb-double-one-line
-my $NB_DOUBLE_ONE_LINE =
-    qr/([^\P{Graph}"\\]*(?:(?:\\[^\n]|[ \t]+)[^\P{Graph}"\\]*)*)/msx;
-
-sub nb_double_one_line {
-    my($derivs) = @_;
-    my($derivs1, $text) = match($derivs, $NB_DOUBLE_ONE_LINE) or return;
-    return ($derivs1, $text);
-}
+my $NB_DOUBLE_ONE_LINE = qr{(
+    [^\P{Graph}"\\]*
+    (?: (?: [ \t]+
+        |   \\[0abt\tnvfre "/\\N_LPxuU] )
+        [^\P{Graph}"\\]* )*
+)}msx;
 
 # [116] nb-double-multi-line(n)
 sub nb_double_multi_line {
-    my($derivs, $n) = @_;
+    my($n) = @_;
     $n = $n < 0 ? 0 : $n;
-    my $lex = qr{(
+    return qr{(
         [^\P{Graph}"\\]*
         (?: (?: [ \t]+
             |   \n(?:[ ]{$n}[ \t]*|[ ]*(?=[\n"]))
             |   \\[0abt\tnvfre "/\\N_LPxuU\n] )
             [^\P{Graph}"\\]* )*
     )}msx;
-    my($derivs1, $text) = match($derivs, $lex) or return;
-    return ($derivs1, $text);
 }
 
+# [109] c-double-quoted(n,c)
+sub c_double_quoted {
+    my($derivs, $n, $c) = @_;
+    my($derivs1) = match($derivs, q(")) or return;
+    my $lex = $c eq 'block-key' || $c eq 'flow-key'
+        ? $NB_DOUBLE_ONE_LINE
+        : nb_double_multi_line($n);
+    my($derivs2, $text) = match($derivs1, $lex) or return;
+    my($derivs3) = match($derivs2, q(")) or return;
+    return ($derivs3, ['c-double-quoted', decode_double_text($text)]);
+}
+
+# [41] to [62] c-ns-esc-char
 my %UNESCAPE = (
     '0' => "\x00", 'a' => "\x07", 'b' => "\x08", 't' => "\t", "\t" => "\t",
     'n' => "\n", 'v' => "\x0b", 'f' => "\f", 'r' => "\r", 'e' => "\e",
@@ -308,40 +304,33 @@ sub decode_double_text {
     return $s;
 }
 
-# [120] c-single-quoted(n,c)
-sub c_single_quoted {
-    my($derivs, $n, $c) = @_;
-    my($derivs1) = match($derivs, q(')) or return;
-    my $product = $c eq 'block-key' || $c eq 'flow-key'
-        ? \&nb_single_one_line
-        : \&nb_single_multi_line;
-    my($derivs2, $text) = $product->($derivs1, $n) or return;
-    my($derivs3) = match($derivs2, q(')) or return;
-    return ($derivs3, ['c-single-quoted', decode_single_text($text)]);
-}
-
 # [122] nb-single-one-line
-my $NB_SINGLE_ONE_LINE = qr/([^\P{Graph}']*(?:(?:''|[ \t]+)[^\P{Graph}']*)*)/msx;
-
-sub nb_single_one_line {
-    my($derivs) = @_;
-    my($derivs1, $text) = match($derivs, $NB_SINGLE_ONE_LINE) or return;
-    return ($derivs1, $text);
-}
+my $NB_SINGLE_ONE_LINE =
+    qr/([^\P{Graph}']*(?:(?:[ \t]+|'')[^\P{Graph}']*)*)/msx;
 
 # [125] nb-single-multi-line
 sub nb_single_multi_line {
-    my($derivs, $n) = @_;
+    my($n) = @_;
     $n = $n < 0 ? 0 : $n;
-    my $lex = qr{(
+    return qr{(
         [^\P{Graph}']*
         (?: (?: [ \t]+
             |   \n(?:[ ]{$n}[ \t]*|[ ]*(?=[\n"]))
             |   '' )
             [^\P{Graph}']* )*
     )}msx;
-    my($derivs1, $text) = match($derivs, $lex) or return;
-    return ($derivs1, $text);
+}
+
+# [120] c-single-quoted(n,c)
+sub c_single_quoted {
+    my($derivs, $n, $c) = @_;
+    my($derivs1) = match($derivs, q(')) or return;
+    my $lex = $c eq 'block-key' || $c eq 'flow-key'
+        ? $NB_SINGLE_ONE_LINE
+        : nb_single_multi_line($n);
+    my($derivs2, $text) = match($derivs1, $lex) or return;
+    my($derivs3) = match($derivs2, q(')) or return;
+    return ($derivs3, ['c-single-quoted', decode_single_text($text)]);
 }
 
 # decode_single_text: (Str)->Str
@@ -361,19 +350,6 @@ sub decode_single_text {
     return $s;
 }
 
-# [131] ns-plain(n,c)
-sub ns_plain {
-    my($derivs, $n, $c) = @_;
-    my $product =
-          $c eq 'flow-out'  ? \&ns_plain_multi_line_out
-        : $c eq 'flow-in'   ? \&ns_plain_multi_line_in
-        : $c eq 'block-key' ? \&ns_plain_one_line_out
-        : $c eq 'flow-key'  ? \&ns_plain_one_line_in
-        : Carp::confess('ns_plain: invalid c');
-    my($derivs1, $text) = $product->($derivs, $n) or return;
-    return ($derivs1, ['ns-plain', $text]);
-}
-
 # [127] ns-plain-safe(c)
 # [128] ns-plain-safe-out
 # [129] ns-plain-safe-in
@@ -389,58 +365,52 @@ my $PLAIN_WORD_IN = qr{
 
 # [133] ns-plain-one-line(c)
 my $PLAIN_ONE_OUT = qr{
+    (?!(?:^---|^[.][.][.]))
     (?:[^\P{Graph}?:\-,\[\]\{\}\#&*!|>'"%\@`]|[?:\-](?=\p{Graph}))
     [^\P{Graph}:]*(?:[:]+[^\P{Graph}:]+)*
     (?:[ \t]+$PLAIN_WORD_OUT)*
 }msx;
-
-sub ns_plain_one_line_out {
-    my($derivs) = @_;
-    my($derivs1, $text) = match($derivs, qr{
-        (?!(?:^---|^[.][.][.]))($PLAIN_ONE_OUT)
-    }omsx) or return;
-    return ($derivs1, $text);
-}
-
 my $PLAIN_ONE_IN = qr{
+    (?!(?:^---|^[.][.][.]))
     (?:[^\P{Graph}?:\-,\[\]\{\}\#&*!|>'"%\@`]|[?:\-](?=[^\P{Graph},\[\]\{\}]))
     [^\P{Graph}:,\[\]\{\}]*(?:[:]+[^\P{Graph}:,\[\]\{\}]+)*
     (?:[ \t]+$PLAIN_WORD_IN)*
 }msx;
-
-sub ns_plain_one_line_in {
-    my($derivs) = @_;
-    my($derivs1, $text) = match($derivs, qr{
-        (?!(?:^---|^[.][.][.]))($PLAIN_ONE_IN)
-    }omsx) or return;
-    return ($derivs1, $text);
-}
+my $NS_PLAIN_ONE_LINE_OUT = qr/($PLAIN_ONE_OUT)/msx;
+my $NS_PLAIN_ONL_LINE_IN = qr/($PLAIN_ONE_IN)/msx;
 
 # [135] ns-plain-multi-line(n,c)
 sub ns_plain_multi_line_out {
-    my($derivs, $n) = @_;
-    my $lex = qr{(
-        (?!(?:^---|^[.][.][.]))
+    my($n) = @_;
+    return qr{(
         $PLAIN_ONE_OUT
         (?: [ \t]* \n (?:(?:[ ]{$n}[ \t]*|[ ]*)\n)*
             (?!(?:---|[.][.][.])) [ ]{$n}[ \t]*
             $PLAIN_WORD_OUT(?:[ \t]+$PLAIN_WORD_OUT)*)*
     )}msx;
-    my($derivs1, $text) = match($derivs, $lex) or return;
-    return ($derivs1, decode_s_flow_folded($text));
 }
 
 sub ns_plain_multi_line_in {
-    my($derivs, $n) = @_;
-    my $lex = qr{(
-        (?!(?:^---|^[.][.][.]))
+    my($n) = @_;
+    return qr{(
         $PLAIN_ONE_IN
         (?: [ \t]* \n (?:(?:[ ]{$n}[ \t]*|[ ]*)\n)*
             (?!(?:---|[.][.][.])) [ ]{$n}[ \t]*
             $PLAIN_WORD_IN(?:[ \t]+$PLAIN_WORD_IN)*)*
     )}msx;
+}
+
+# [131] ns-plain(n,c)
+sub ns_plain {
+    my($derivs, $n, $c) = @_;
+    my $lex =
+          $c eq 'flow-out'  ? ns_plain_multi_line_out($n)
+        : $c eq 'flow-in'   ? ns_plain_multi_line_in($n)
+        : $c eq 'block-key' ? $NS_PLAIN_ONE_LINE_OUT
+        : $c eq 'flow-key'  ? $NS_PLAIN_ONL_LINE_IN
+        : Carp::confess('ns_plain: invalid c');
     my($derivs1, $text) = match($derivs, $lex) or return;
-    return ($derivs1, decode_s_flow_folded($text));
+    return ($derivs1, ['ns-plain',  decode_s_flow_folded($text)]);
 }
 
 sub decode_s_flow_folded {
@@ -452,7 +422,6 @@ sub decode_s_flow_folded {
 
 # 7.4. Flow Collection Styles
 #
-
 # [136] in-flow(c)
 my %in_flow = (
     'flow-out' => 'flow-in',
@@ -460,6 +429,20 @@ my %in_flow = (
     'block-key' => 'flow-key',
     'flow-key' => 'flow-key',
 );
+
+my %JSON_FLOW_NODE = (
+    'c-flow-sequence' => 'c-flow-sequence',
+    'c-flow-mapping'  => 'c-flow-mapping',
+    'c-single-quoted' => 'c-single-quoted',
+    'c-double-quoted' => 'c-double-quoted',    
+);
+
+sub is_json_flow_node {
+    my($node) = @_;
+    return if ! $node;
+    my $kind = $node->[0] eq 'c-ns-properties' ? $node->[3][0] : $node->[0];
+    return $JSON_FLOW_NODE{$kind};
+}
 
 # [137] c-flow-sequence(n,c)
 sub c_flow_sequence {
@@ -481,45 +464,17 @@ sub c_flow_sequence {
 # [139] ns-flow-seq-entry
 sub ns_flow_seq_entry {
     my($derivs, $n, $c) = @_;
-    my($derivs1, $entry);
-    $derivs
-    and $derivs1 = match($derivs, '?')
-    and $derivs1 = s_separate($derivs1, $n, $c)
-    and ($derivs1, $entry) = ns_flow_map_explicit_entry($derivs1, $n, $c)
-    and return ($derivs1, ['c-flow-mapping', @{$entry}]);
+    my($derivs1, $entry) = ns_flow_map_explicit_entry($derivs, $n, $c);
+    return ($derivs1, ['c-flow-mapping', @{$entry}]) if $derivs1;
 
-    my($prop, $derivs4);
-    my($derivs3, $key) = c_ns_alias_node($derivs);
-    if (! $derivs3) {
-        ($derivs1, $prop) = c_ns_properties($derivs, 0, 'flow-key');
-        my $derivs2 = $derivs1 ? s_separate($derivs1, 0, 'flow-key') : $derivs;
-        not $derivs2 and $derivs3 = $derivs1
-        or ($derivs3, $key) = ns_plain($derivs2, 0, 'flow-key')
-        or ($derivs4, $key) = c_flow_sequence($derivs2, 0, 'flow-key')
-        or ($derivs4, $key) = c_flow_mapping($derivs2, 0, 'flow-key')
-        or ($derivs4, $key) = c_single_quoted($derivs2, 0, 'flow-key')
-        or ($derivs4, $key) = c_double_quoted($derivs2, 0, 'flow-key')
-        or $derivs3 = $derivs1;
-    }
-    $key = ! $prop && ! $key ? ['e-scalar']
-         : ! $prop && $key ? $key
-         : [@{$prop}, $key || ['e-scalar']];
-    RULE: {
-        my $colon = $c eq 'flow-in' || $c eq 'flow-key'
-            ? qr/[:](?=[ \t\r\n,\[\]\{\}])/omsx
-            : qr/[:](?=[ \t\r\n])/omsx;
-        my $derivs5 = $derivs3 || $derivs4 || $derivs;
-        my $derivs6 = s_separate($derivs5, $n, $c) || $derivs5;
-        my $derivs7 = match($derivs6, $derivs4 ? ':' : $colon) or last;
-        RULE1: {
-            my $derivs8 = s_separate($derivs7, $n, $c)
-                || ($derivs4 ? $derivs7 : last);
-            my($derivs9, $value) = ns_flow_node($derivs8, $n, $c) or last;
-            return ($derivs9, ['c-flow-mapping', $key, $value]);
-        }
-        return ($derivs7, ['c-flow-mapping', $key, ['e-scalar']]);
-    }
-    return ($derivs3 || $derivs4, $key) if $derivs3 || $derivs4;
+    my($derivs2, $key) = ns_flow_node($derivs, 0, 'flow-key');
+    $key ||= ['e-scalar'];
+    my $json_key = is_json_flow_node($key);
+    my($derivs3, $value) =
+        c_ns_flow_map_value($derivs2 || $derivs, $n, $c, $json_key);
+    return ($derivs3, ['c-flow-mapping', $key, $value]) if $derivs3;
+
+    return ($derivs2, $key) if $json_key;
     return ns_flow_node($derivs, $n, $c);
 }
 
@@ -543,66 +498,57 @@ sub c_flow_mapping {
 # [142] ns-flow-map-entry
 sub ns_flow_map_entry {
     my($derivs, $n, $c) = @_;
-    my $derivs1 = $derivs;
-    $derivs1
-    and $derivs1 = match($derivs1, '?')
-    and $derivs1 = s_separate($derivs1, $n, $c)
-    and return ns_flow_map_explicit_entry($derivs1, $n, $c);
+    my($derivs1, $entry) = ns_flow_map_explicit_entry($derivs, $n, $c);
+    return ($derivs1, $entry) if $derivs1;
     return ns_flow_map_implicit_entry($derivs, $n, $c);
 }
 
 # [143] ns-flow-map-explicit-entry(n,c)
 sub ns_flow_map_explicit_entry {
     my($derivs, $n, $c) = @_;
-    my($derivs1, $entry) = ns_flow_map_implicit_entry($derivs, $n, $c);
-    return ($derivs1, $entry) if $entry;
-    return ($derivs, [['e-scalar'], ['e-scalar']]);
+    my $derivs1 = match($derivs, '?') or return;
+    my $derivs2 = s_separate($derivs1, $n, $c) or return;
+    my($derivs3, $entry) = ns_flow_map_implicit_entry($derivs2, $n, $c);
+    return ($derivs3, $entry) if $derivs3;
+    return ($derivs2, [['e-scalar'], ['e-scalar']]);
 }
 
 # [144] ns-flow-map-implicit-entry(n,c)
 sub ns_flow_map_implicit_entry {
     my($derivs, $n, $c) = @_;
-    my($derivs1, $prop, $derivs4);
-    my($derivs3, $key) = c_ns_alias_node($derivs);
-    if (! $derivs3) {
-        ($derivs1, $prop) = c_ns_properties($derivs, $n, $c);
-        my $derivs2 = $derivs1 ? s_separate($derivs1, $n, $c) : $derivs;
-        not $derivs2 and $derivs3 = $derivs1
-        or ($derivs3, $key) = ns_plain($derivs2, $n, $c)
-        or ($derivs4, $key) = c_flow_sequence($derivs2, $n, $c)
-        or ($derivs4, $key) = c_flow_mapping($derivs2, $n, $c)
-        or ($derivs4, $key) = c_single_quoted($derivs2, $n, $c)
-        or ($derivs4, $key) = c_double_quoted($derivs2, $n, $c)
-        or $derivs3 = $derivs1;
+    my($derivs1, $key) = ns_flow_node($derivs, $n, $c);
+    $key ||= ['e-scalar'];
+    my $adjacent = is_json_flow_node($key);
+    my($derivs2, $value) =
+        c_ns_flow_map_value($derivs1 || $derivs, $n, $c, $adjacent);
+    return ($derivs2, [$key, $value]) if $derivs2;
+    return ($derivs1, [$key, ['e-scalar']]) if $derivs1;
+    return;
+}
+
+# [147] s-separate(n,c)? c-ns-flow-map-separate-value(n,c)
+# [149] s-separate(n,c)? c-ns-flow-map-adjacent-value(n,c)
+sub c_ns_flow_map_value {
+    my($derivs, $n, $c, $adjacent) = @_;
+    my $colon = $adjacent ? q(:)
+        : $c ne 'flow-in' && $c ne 'flow-key' ? qr/[:](?=[ \t\r\n])/omsx
+        : qr/[:](?=[ \t\r\n,\[\]\{\}])/omsx;
+    my $derivs1 = s_separate($derivs, $n, $c) || $derivs;
+    my $derivs2 = match($derivs1, $colon) or return;
+    RULE1: {
+        my $derivs3 = s_separate($derivs2, $n, $c)
+            || ($adjacent ? $derivs2 : last);
+        my($derivs4, $value) = ns_flow_node($derivs3, $n, $c) or last;
+        return ($derivs4, $value);
     }
-    $key = ! $prop && ! $key ? ['e-scalar']
-         : ! $prop && $key ? $key
-         : [@{$prop}, $key || ['e-scalar']];
-    RULE: {
-        my $colon = $c eq 'flow-in' || $c eq 'flow-key'
-            ? qr/[:](?=[ \t\r\n,\[\]\{\}])/omsx
-            : qr/[:](?=[ \t\r\n])/omsx;
-        my $derivs5 = $derivs3 || $derivs4 || $derivs;
-        my $derivs6 = s_separate($derivs5, $n, $c) || $derivs5;
-        my $derivs7 = match($derivs6, $derivs4 ? ':' : $colon) or last;
-        RULE1: {
-            my $derivs8 = s_separate($derivs7, $n, $c)
-                || ($derivs4 ? $derivs7 : last);
-            my($derivs9, $value) = ns_flow_node($derivs8, $n, $c) or last;
-            return ($derivs9, [$key, $value]);
-        }
-        return ($derivs7, [$key, ['e-scalar']]);
-    }
-    return if ! $derivs3 && ! $derivs4;
-    return ($derivs3 || $derivs4, [$key, ['e-scalar']]);
+    return ($derivs2, ['e-scalar']);
 }
 
 # [161] ns-flow-node(n,c)
 sub ns_flow_node {
     my($derivs, $n, $c) = @_;
     my($derivs3, $node) = c_ns_alias_node($derivs);
-    return ($derivs3, $node) if $node;
-
+    return ($derivs3, $node) if $derivs3;
     my($derivs1, $prop) = c_ns_properties($derivs, $n, $c);
     my $derivs2 = $derivs1 ? s_separate($derivs1, $n, $c) : $derivs;
     not $derivs2
@@ -611,9 +557,8 @@ sub ns_flow_node {
     or ($derivs3, $node) = c_flow_mapping($derivs2, $n, $c)
     or ($derivs3, $node) = c_single_quoted($derivs2, $n, $c)
     or ($derivs3, $node) = c_double_quoted($derivs2, $n, $c);
-
-    return ($derivs3, $prop ? [@{$prop}, $node] : $node) if $node;
-    return ($derivs1, [@{$prop}, ['e-scalar']]) if $prop;
+    return ($derivs3, $prop ? [@{$prop}, $node] : $node) if $derivs3;
+    return ($derivs1, [@{$prop}, ['e-scalar']]) if $derivs1;
     return;
 }
 
@@ -628,10 +573,10 @@ my $BLOCK_SCALAR =
 sub c_l__block_scalar {
     my($derivs, $n) = @_;
     $n = defined $n && $n >= 0 ? $n : 0;
-    my($derivs1, @p) = match($derivs, $BLOCK_SCALAR) or return;
-    my $type = $p[0] eq q(|) ? 'c-l+literal' : 'c-l+folded';
-    my $indentation = defined $p[1] ? $p[1] : $p[4];
-    my $chomp = $p[2] || $p[3] || q();
+    my($derivs1, @capture) = match($derivs, $BLOCK_SCALAR) or return;
+    my $type = $capture[0] eq q(|) ? 'c-l+literal' : 'c-l+folded';
+    my $indentation = defined $capture[1] ? $capture[1] : $capture[4];
+    my $chomp = $capture[2] || $capture[3] || q();
     if (! defined $indentation) {
         my(undef, $w) = match($derivs1, qr/(?:[ \t]*\n)*([ ]*)[^ \n]/omsx);
         $w ||= q();
@@ -660,7 +605,7 @@ sub l__block_sequence {
     my @seq;
     my($derivs1, $spaces) = match($derivs, qr/([ ]*)(?=[-][ \t\n])/omsx) or return;
     my $n1 = length $spaces;
-    $n1 - $n > 0 or return;
+    $n1 > $n or return;
     my $lex = qr/[ ]{$n1}-(?=[ \t\n])/msx;
     $derivs1 = $derivs;
     while (my $derivs2 = match($derivs1, $lex)) {
@@ -696,9 +641,9 @@ sub s_l__block_indented {
         my($derivs1, $spaces) = match($derivs, qr/([ ]+)/omsx) or last;
         my $m = length $spaces;
         my($derivs2, $entry) = ns_l_compact_sequence($derivs1, $n + 1 + $m);
-        return ($derivs2, $entry) if $entry;
+        return ($derivs2, $entry) if $derivs2;
         ($derivs2, $entry) = ns_l_compact_mapping($derivs1, $n + 1 + $m);
-        return ($derivs2, $entry) if $entry;
+        return ($derivs2, $entry) if $derivs2;
     }
     RULE: {
         my($derivs1, $entry) = s_l__block_node($derivs, $n, $c) or last;
@@ -717,7 +662,7 @@ sub l__block_mapping {
     my @map;
     my($derivs1, $spaces) = match($derivs, qr/([ ]*)/omsx) or return;
     my $n1 = length $spaces;
-    $n1 - $n > 0 or return;
+    $n1 > $n or return;
     my $indent = q( ) x $n1;
     $derivs1 = $derivs;
     while (my $derivs2 = match($derivs1, $indent)) {
@@ -736,41 +681,24 @@ sub ns_l_block_map_entry {
         my $derivs1 = match($derivs, '?') or last;
         my($derivs2, $key) =
             s_l__block_indented($derivs1, $n, 'block-out') or last;
-        my($derivs4, $value);
-        if (my $derivs3 = match($derivs2, qr/^[ ]{$n}:/msx)) {
-            ($derivs4, $value) = s_l__block_indented($derivs3, $n, 'block-out');
-        }
-        return ($derivs4, [$key, $value]) if $value;
+        my($derivs3, $value);
+        $derivs2
+        and $derivs3 = match($derivs2, qr/^[ ]{$n}:/msx)
+        and ($derivs3, $value) = s_l__block_indented($derivs3, $n, 'block-out')
+        and return ($derivs3, [$key, $value]);
         return ($derivs2, [$key, ['e-scalar']]);
     }
     RULE: {
-        my($derivs1, $prop);
-        my($derivs3, $key) = c_ns_alias_node($derivs);
-        if (! $derivs3) {
-            ($derivs1, $prop) = c_ns_properties($derivs, 0, 'flow-key');
-            my $derivs2 = $derivs1 ? s_separate($derivs1, 0, 'flow-key') : $derivs;
-            not $derivs2 and $derivs3 = $derivs1
-            or ($derivs3, $key) = ns_plain($derivs2, 0, 'flow-key')
-            or ($derivs3, $key) = c_flow_sequence($derivs2, 0, 'flow-key')
-            or ($derivs3, $key) = c_flow_mapping($derivs2, 0, 'flow-key')
-            or ($derivs3, $key) = c_single_quoted($derivs2, 0, 'flow-key')
-            or ($derivs3, $key) = c_double_quoted($derivs2, 0, 'flow-key')
-            or $derivs3 = $derivs1;
+        my($derivs1, $key) = ns_flow_node($derivs, 0, 'flow-key');
+        $key ||= ['e-scalar'];
+        if ($derivs1) {
+            $derivs1 = match($derivs1, qr/[ ]+/omsx) || $derivs1;
         }
-        $key = ! $prop && ! $key ? ['e-scalar']
-             : ! $prop && $key ? $key
-             : [@{$prop}, $key || ['e-scalar']];
-        if ($derivs3) {
-            $derivs3 = match($derivs3, qr/[ ]+/omsx) || $derivs3;
-        }
-        else {
-            $derivs3 = $derivs;
-        }
-        my $derivs4 = match($derivs3, ':') or last;
-        my($derivs5, $value) = s_l__block_node($derivs4, $n, 'block-out');
-        return ($derivs5, [$key, $value]) if $value;
-        my $derivs6 = s_l_comments($derivs4) or last;
-        return ($derivs6, [$key, ['e-scalar']]);
+        my $derivs2 = match($derivs1 || $derivs, ':') or last;
+        my($derivs3, $value) = s_l__block_node($derivs2, $n, 'block-out');
+        return ($derivs3, [$key, $value]) if $derivs3;
+        my $derivs4 = s_l_comments($derivs2) or last;
+        return ($derivs4, [$key, ['e-scalar']]);
     }
     return;
 }
@@ -815,7 +743,7 @@ sub s_l__block_node {
         my $derivs2 = s_l_comments($derivs1) or last;
         my $n1 = $c eq 'block-out' ? $n - 1 : $n;
         my($derivs3, $node) = l__block_sequence($derivs2, $n1);
-        return ($derivs3, $prop ? [@{$prop}, $node] : $node) if $node;
+        return ($derivs3, $prop ? [@{$prop}, $node] : $node) if $derivs3;
         ($derivs3, $node) = l__block_mapping($derivs2, $n) or last;
         return ($derivs3, $prop ? [@{$prop}, $node] : $node);
     }
@@ -828,52 +756,37 @@ sub s_l__block_node {
     return;
 }
 
+# [205] l-document-suffix
+my $L_DOCUMENT_SUFFIX = qr/(?:[.][.][.]$S_L_COMMENTS)+/msx;
+
 # [211] l-yaml-stream
 sub l_yaml_stream {
     my($derivs) = @_;
     my @stream;
     my $but_first = 0;
-    my $suffix = qr/(?:[.][.][.]$S_L_COMMENTS)+/omsx;
     my $derivs1 = $derivs;
     while (! end_of_file($derivs1)) {
+        $derivs1 = match($derivs1, $L_COMMENT) || $derivs1;
         if ($but_first++) {
-            my $derivs2 = match($derivs1, $suffix) or last;
+            my $derivs2 = match($derivs1, $L_DOCUMENT_SUFFIX) or last;
             $derivs1 = $derivs2;
         }
-        $derivs1 = match($derivs1, $L_COMMENT) || $derivs1;
+        end_of_file($derivs1) and last;
         my @directive;
-        while (my($derivs2, $directive) = l_directive($derivs1)) {
-            push @directive, $directive;
-            $derivs1 = $derivs2;
+        if (match($derivs1, '%')) {
+            while (my($derivs2, $directive) = l_directive($derivs1)) {
+                push @directive, $directive;
+                $derivs1 = $derivs2;
+            }
+            match($derivs1, '---') or return;
         }
-        if (my $derivs3 = match($derivs1, '---')) {
-            my($derivs2, $node) = s_l__block_node($derivs3, -1, 'block-in');
-            if (! $node) {
-                $derivs2 = s_l_comments($derivs3)
-                    or croak 'SyntaxError: broken directives end marker.';
-                $node = ['e-scalar'];
-            }
-            if (@directive) {
-                push @stream, ['l-directive-document', @directive, $node];
-            }
-            else {
-                push @stream, ['l-explicit-document', $node];
-            }
-            $derivs1 = $derivs2;
-        }
-        else {
-            croak 'SyntaxError: missing directive end marker.' if @directive;
+        if (! match($derivs1, '---')) {
             my($derivs2, $node) = s_l__block_node($derivs1, -1, 'block-in');
-            if ($node) {
+            if ($derivs2) {
                 push @stream, ['l-bare-document', $node];
+                $derivs1 = $derivs2;
             }
-            else {
-                $derivs2 = match($derivs1, qr/.*?(?=(?:^---|^[.][.][.]|\z))/omsx)
-                    or croak 'SyntaxError: document end marker not found.'
-            }
-            $derivs1 = $derivs2;
         }
-        $derivs1 = match($derivs1, $L_COMMENT) || $derivs1;
         while (my $derivs2 = match($derivs1, '---')) {
             my($derivs3, $node) = s_l__block_node($derivs2, -1, 'block-in');
             if (! $node) {
@@ -881,7 +794,13 @@ sub l_yaml_stream {
                     or croak 'SyntaxError: broken directives end marker.';
                 $node = ['e-scalar'];
             }
-            push @stream, ['l-explicit-document', $node];
+            if (@directive) {
+                push @stream, ['l-directive-document', @directive, $node];
+                @directive = ();
+            }
+            else {
+                push @stream, ['l-explicit-document', $node];
+            }
             $derivs1 = match($derivs3, $L_COMMENT) || $derivs3;
         }
     }
@@ -900,7 +819,7 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memorized)
 
 =head1 VERSION
 
-0.001
+0.002
 
 =head1 SYNOPSIS
 
