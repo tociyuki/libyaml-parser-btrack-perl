@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 use Exporter;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 # $Id$
 
 our @ISA = qw(Exporter);
@@ -180,23 +180,20 @@ sub l_directive {
 # [96] c-ns-properties(n,c)
 sub c_ns_properties {
     my($derivs, $n, $c) = @_;
+    my($derivs1, $tag, $derivs2, $anchor);
     RULE: {
-        my($derivs1, $tag) = c_ns_tag_property($derivs) or last;
-        OPTION: {
-            my($derivs2) = s_separate($derivs1, $n, $c) or last;
-            my($derivs3, $anchor) = c_ns_anchor_property($derivs2) or last;
-            return ($derivs3, ['c-ns-properties', $tag, $anchor]);
-        }
-        return ($derivs1, ['c-ns-properties', $tag, undef]);
+        ($derivs1, $tag) = c_ns_tag_property($derivs) or last;
+        $derivs1
+        and $derivs2 = s_separate($derivs1, $n, $c)
+        and ($derivs2, $anchor) = c_ns_anchor_property($derivs2);
+        return ($derivs2 || $derivs1, ['c-ns-properties', $tag, $anchor]);
     }
     RULE: {
-        my($derivs1, $anchor) = c_ns_anchor_property($derivs) or last;
-        OPTION: {
-            my($derivs2) = s_separate($derivs1, $n, $c) or last;
-            my($derivs3, $tag) = c_ns_tag_property($derivs2) or last;
-            return ($derivs3, ['c-ns-properties', $tag, $anchor]);
-        }
-        return ($derivs1, ['c-ns-properties', undef, $anchor]);
+        ($derivs1, $anchor) = c_ns_anchor_property($derivs) or last;
+        $derivs1
+        and $derivs2 = s_separate($derivs1, $n, $c)
+        and ($derivs2, $tag) = c_ns_tag_property($derivs2);
+        return ($derivs2 || $derivs1, ['c-ns-properties', $tag, $anchor]);
     }
     return;
 }
@@ -484,15 +481,15 @@ sub c_flow_mapping {
     my $c1 = $in_flow{$c};
     my $derivs1 = match($derivs, '{') or return;
     $derivs = s_separate($derivs1, $n, $c) || $derivs1;
-    my @seq;
+    my @map;
     while (my($derivs2, $x) = ns_flow_map_entry($derivs, $n, $c1)) {
-        push @seq, @{$x};
+        push @map, @{$x};
         $derivs = s_separate($derivs2, $n, $c1) || $derivs2;
         $derivs2 = match($derivs, ',') or last;
         $derivs = s_separate($derivs2, $n, $c1) || $derivs2;
     }
     $derivs = match($derivs, '}') or return;
-    return ($derivs, ['c-flow-mapping', @seq]);
+    return ($derivs, ['c-flow-mapping', @map]);
 }
 
 # [142] ns-flow-map-entry
@@ -607,14 +604,13 @@ sub l__block_sequence {
     my $n1 = length $spaces;
     $n1 > $n or return;
     my $lex = qr/[ ]{$n1}-(?=[ \t\n])/msx;
-    $derivs1 = $derivs;
-    while (my $derivs2 = match($derivs1, $lex)) {
+    while (my $derivs2 = match($derivs, $lex)) {
         my($derivs3, $entry) =
             s_l__block_indented($derivs2, $n1, 'block-in') or last;
         push @seq, $entry;
-        $derivs1 = $derivs3;
+        $derivs = $derivs3;
     }
-    return ($derivs1, ['l+block-sequence', @seq]) if @seq;
+    return ($derivs, ['l+block-sequence', @seq]) if @seq;
     return;
 }
 
@@ -640,18 +636,16 @@ sub s_l__block_indented {
     RULE: {
         my($derivs1, $spaces) = match($derivs, qr/([ ]+)/omsx) or last;
         my $m = length $spaces;
-        my($derivs2, $entry) = ns_l_compact_sequence($derivs1, $n + 1 + $m);
-        return ($derivs2, $entry) if $derivs2;
-        ($derivs2, $entry) = ns_l_compact_mapping($derivs1, $n + 1 + $m);
-        return ($derivs2, $entry) if $derivs2;
+        my($derivs2, $entry2) = ns_l_compact_sequence($derivs1, $n + 1 + $m);
+        return ($derivs2, $entry2) if $derivs2;
+        my($derivs3, $entry3) = ns_l_compact_mapping($derivs1, $n + 1 + $m);
+        return ($derivs3, $entry3) if $derivs3;
     }
     RULE: {
-        my($derivs1, $entry) = s_l__block_node($derivs, $n, $c) or last;
-        return ($derivs1, $entry);
-    }
-    RULE: {
-        my $derivs1 = s_l_comments($derivs) or last;
-        return ($derivs1, ['e-scalar']);
+        my($derivs1, $entry) = s_l__block_node($derivs, $n, $c);
+        return ($derivs1, $entry) if $derivs1;
+        my $derivs2 = s_l_comments($derivs) or last;
+        return ($derivs2, ['e-scalar']);
     }
     return;
 }
@@ -664,13 +658,12 @@ sub l__block_mapping {
     my $n1 = length $spaces;
     $n1 > $n or return;
     my $indent = q( ) x $n1;
-    $derivs1 = $derivs;
-    while (my $derivs2 = match($derivs1, $indent)) {
+    while (my $derivs2 = match($derivs, $indent)) {
         my($derivs3, $entry) = ns_l_block_map_entry($derivs2, $n1) or last;
         push @map, @{$entry};
-        $derivs1 = $derivs3;
+        $derivs = $derivs3;
     }
-    return ($derivs1, ['l+block-mapping', @map]) if @map;
+    return ($derivs, ['l+block-mapping', @map]) if @map;
     return;
 }
 
@@ -689,16 +682,14 @@ sub ns_l_block_map_entry {
         return ($derivs2, [$key, ['e-scalar']]);
     }
     RULE: {
-        my($derivs1, $key) = ns_flow_node($derivs, 0, 'flow-key');
+        my($derivs1, $key) = ns_flow_node($derivs, 0, 'block-key');
         $key ||= ['e-scalar'];
-        if ($derivs1) {
-            $derivs1 = match($derivs1, qr/[ ]+/omsx) || $derivs1;
-        }
-        my $derivs2 = match($derivs1 || $derivs, ':') or last;
-        my($derivs3, $value) = s_l__block_node($derivs2, $n, 'block-out');
-        return ($derivs3, [$key, $value]) if $derivs3;
-        my $derivs4 = s_l_comments($derivs2) or last;
-        return ($derivs4, [$key, ['e-scalar']]);
+        my $derivs2 = $derivs1 && match($derivs1, qr/[ ]+/omsx) || $derivs1;
+        my $derivs3 = match($derivs2 || $derivs, ':') or last;
+        my($derivs4, $value) = s_l__block_node($derivs3, $n, 'block-out');
+        return ($derivs4, [$key, $value]) if $derivs4;
+        my $derivs5 = s_l_comments($derivs3) or last;
+        return ($derivs5, [$key, ['e-scalar']]);
     }
     return;
 }
@@ -723,28 +714,22 @@ sub s_l__block_node {
     my($derivs, $n, $c) = @_;
     RULE: {
         my $derivs1 = s_separate($derivs, $n + 1, $c) or last;
-        my $prop;
-        RULE1: {
-            my($derivs2, $x) = c_ns_properties($derivs1, $n + 1, $c) or last;
-            my $derivs3 = s_separate($derivs2, $n + 1, $c) or last;
-            ($derivs1, $prop) = ($derivs3, $x);
-        }
-        my($derivs2, $node) = c_l__block_scalar($derivs1, $n) or last;
-        return ($derivs2, $prop ? [@{$prop}, $node] : $node);
+        my($derivs2, $prop) = c_ns_properties($derivs1, $n + 1, $c);
+        my $derivs3 = $derivs2 && s_separate($derivs2, $n + 1, $c)
+            || $derivs1;
+        my($derivs4, $node) = c_l__block_scalar($derivs3, $n) or last;
+        return ($derivs4, $prop ? [@{$prop}, $node] : $node);
     }
     RULE: {
-        my $derivs1 = $derivs;
-        my $prop;
-        RULE1: {
-            my $derivs2 = s_separate($derivs1, $n + 1, $c) or last;
-            my($derivs3, $x) = c_ns_properties($derivs2, $n + 1, $c) or last;
-            ($derivs1, $prop) = ($derivs3, $x);
-        }
-        my $derivs2 = s_l_comments($derivs1) or last;
+        my($derivs1, $prop, $derivs3, $node);
+        $derivs
+        and $derivs1 = s_separate($derivs, $n + 1, $c)
+        and ($derivs1, $prop) = c_ns_properties($derivs1, $n + 1, $c);
+        my $derivs2 = s_l_comments($derivs1 || $derivs) or last;
         my $n1 = $c eq 'block-out' ? $n - 1 : $n;
-        my($derivs3, $node) = l__block_sequence($derivs2, $n1);
-        return ($derivs3, $prop ? [@{$prop}, $node] : $node) if $derivs3;
-        ($derivs3, $node) = l__block_mapping($derivs2, $n) or last;
+        $derivs2 and (
+           ($derivs3, $node) = l__block_sequence($derivs2, $n1)
+        or ($derivs3, $node) = l__block_mapping($derivs2, $n) ) or last;
         return ($derivs3, $prop ? [@{$prop}, $node] : $node);
     }
     RULE: {
@@ -819,7 +804,7 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memorized)
 
 =head1 VERSION
 
-0.002
+0.003
 
 =head1 SYNOPSIS
 
