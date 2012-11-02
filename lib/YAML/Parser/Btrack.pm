@@ -49,10 +49,10 @@ sub match {
     }
     elsif (ref $phrase eq 'Regexp') {
         pos(${$derivs->[0]}) = $pos;
-        if (my @match = ${$src} =~ m{\G$phrase}gcmsx) {
-            $#+ < 1 and @match = (); # without captures in phrase
+        if (my @captures = ${$src} =~ m{\G$phrase}gcmsx) {
+            $#+ < 1 and @captures = (); # without captures in phrase
             my $derived = [$src, pos ${$src}];
-            return wantarray ? ($derived, @match) : $derived;
+            return wantarray ? ($derived, @captures) : $derived;
         }
     }
     return;
