@@ -1,5 +1,8 @@
 Revision history for YAML-Parser-Btrack
 
+0.004 Sat Nov  3 01:48:02 2012
+    ! fix correct [\n] from [\\n] in ns_l_compact_sequence.
+
 0.003 Fri Nov  2 13:02:37 2012
     ! fix s/flow-key/block-key/ in ns_l_block_map_entry.
 

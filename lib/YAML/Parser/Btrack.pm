@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 use Exporter;
 
-our $VERSION = '0.003';
+our $VERSION = '0.004';
 # $Id$
 
 our @ISA = qw(Exporter);
@@ -597,10 +597,12 @@ sub c_l__block_scalar {
 # 8.2. Block Collection Styles
 #
 # [183] l+block-sequence(n)
+
 sub l__block_sequence {
     my($derivs, $n) = @_;
     my @seq;
-    my($derivs1, $spaces) = match($derivs, qr/([ ]*)(?=[-][ \t\n])/omsx) or return;
+    my($derivs1, $spaces) =
+        match($derivs, qr/([ ]*)(?=[-][ \t\n])/omsx) or return;
     my $n1 = length $spaces;
     $n1 > $n or return;
     my $lex = qr/[ ]{$n1}-(?=[ \t\n])/msx;
@@ -618,12 +620,14 @@ sub l__block_sequence {
 sub ns_l_compact_sequence {
     my($derivs, $n) = @_;
     my @seq;
-    my $derivs1 = match($derivs, qr/[-](?=[ \t\\n])/omsx) or return;
-    my($derivs2, $entry) = s_l__block_indented($derivs1, $n, 'block-in') or return;
+    my $derivs1 = match($derivs, qr/[-](?=[ \t\n])/omsx) or return;
+    my($derivs2, $entry) =
+        s_l__block_indented($derivs1, $n, 'block-in') or return;
     push @seq, $entry;
-    my $lex = qr/[ ]{$n}[-](?=[ \t\\n])/msx;
+    my $lex = qr/[ ]{$n}[-](?=[ \t\n])/msx;
     while (my $derivs3 = match($derivs2, $lex)) {
-        ($derivs3, $entry) = s_l__block_indented($derivs3, $n, 'block-in') or last;
+        ($derivs3, $entry) =
+            s_l__block_indented($derivs3, $n, 'block-in') or last;
         push @seq, $entry;
         $derivs2 = $derivs3;
     }
@@ -804,7 +808,7 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memorized)
 
 =head1 VERSION
 
-0.003
+0.004
 
 =head1 SYNOPSIS
 
