@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 use Exporter;
 
-our $VERSION = '0.004';
+our $VERSION = '0.005';
 # $Id$
 
 our @ISA = qw(Exporter);
@@ -597,7 +597,6 @@ sub c_l__block_scalar {
 # 8.2. Block Collection Styles
 #
 # [183] l+block-sequence(n)
-
 sub l__block_sequence {
     my($derivs, $n) = @_;
     my @seq;
@@ -605,33 +604,32 @@ sub l__block_sequence {
         match($derivs, qr/([ ]*)(?=[-][ \t\n])/omsx) or return;
     my $n1 = length $spaces;
     $n1 > $n or return;
-    my $lex = qr/[ ]{$n1}-(?=[ \t\n])/msx;
-    while (my $derivs2 = match($derivs, $lex)) {
-        my($derivs3, $entry) =
-            s_l__block_indented($derivs2, $n1, 'block-in') or last;
-        push @seq, $entry;
-        $derivs = $derivs3;
-    }
-    return ($derivs, ['l+block-sequence', @seq]) if @seq;
+    my($derivs2, $seq) = l_block_seq_entries($derivs, $n1);
+    return ($derivs2, ['l+block-sequence', @{$seq}]) if @{$seq};
     return;
 }
 
 # [186] ns-l-compact-sequence(n)
 sub ns_l_compact_sequence {
     my($derivs, $n) = @_;
-    my @seq;
     my $derivs1 = match($derivs, qr/[-](?=[ \t\n])/omsx) or return;
     my($derivs2, $entry) =
         s_l__block_indented($derivs1, $n, 'block-in') or return;
-    push @seq, $entry;
-    my $lex = qr/[ ]{$n}[-](?=[ \t\n])/msx;
-    while (my $derivs3 = match($derivs2, $lex)) {
-        ($derivs3, $entry) =
-            s_l__block_indented($derivs3, $n, 'block-in') or last;
+    my($derivs3, $seq) = l_block_seq_entries($derivs2, $n);
+    return ($derivs3, ['ns-l-compact-sequence', $entry, @{$seq}]);
+}
+
+sub l_block_seq_entries {
+    my($derivs, $n) = @_;
+    my @seq;
+    my $lex = qr/[ ]{$n}-(?=[ \t\n])/msx;
+    while (my $derivs1 = match($derivs, $lex)) {
+        my($derivs2, $entry) =
+            s_l__block_indented($derivs1, $n, 'block-in') or last;
         push @seq, $entry;
-        $derivs2 = $derivs3;
+        $derivs = $derivs2;
     }
-    return ($derivs2, ['ns-l-compact-sequence', @seq]);
+    return ($derivs, \@seq);
 }
 
 # [185] s-l-block-indented(n,c)
@@ -657,18 +655,32 @@ sub s_l__block_indented {
 # [187] l+block-mapping(n)
 sub l__block_mapping {
     my($derivs, $n) = @_;
-    my @map;
     my($derivs1, $spaces) = match($derivs, qr/([ ]*)/omsx) or return;
     my $n1 = length $spaces;
     $n1 > $n or return;
-    my $indent = q( ) x $n1;
-    while (my $derivs2 = match($derivs, $indent)) {
-        my($derivs3, $entry) = ns_l_block_map_entry($derivs2, $n1) or last;
-        push @map, @{$entry};
-        $derivs = $derivs3;
-    }
-    return ($derivs, ['l+block-mapping', @map]) if @map;
+    my($derivs2, $map) = l_block_map_entries($derivs, $n1);
+    return ($derivs2, ['l+block-mapping', @{$map}]) if @{$map};
     return;
+}
+
+# [195] ns-l-compact-mapping(n)
+sub ns_l_compact_mapping {
+    my($derivs, $n) = @_;
+    my($derivs1, $entry) = ns_l_block_map_entry($derivs, $n) or return;
+    my($derivs2, $map) = l_block_map_entries($derivs1, $n);
+    return ($derivs2, ['ns-l-compact-mapping', @{$entry}, @{$map}]);
+}
+
+sub l_block_map_entries {
+    my($derivs, $n) = @_;
+    my @map;
+    my $indent = q( ) x $n;
+    while (my $derivs1 = match($derivs, $indent)) {
+        my($derivs2, $entry) = ns_l_block_map_entry($derivs1, $n) or last;
+        push @map, @{$entry};
+        $derivs = $derivs2;
+    }
+    return ($derivs, \@map);
 }
 
 # [188] ns-l-block-map-entry(n)
@@ -696,21 +708,6 @@ sub ns_l_block_map_entry {
         return ($derivs5, [$key, ['e-scalar']]);
     }
     return;
-}
-
-# [195] ns-l-compact-mapping(n)
-sub ns_l_compact_mapping {
-    my($derivs, $n) = @_;
-    my @map;
-    my($derivs1, $entry) = ns_l_block_map_entry($derivs, $n) or return;
-    push @map, @{$entry};
-    my $indent = q( ) x $n;
-    while (my $derivs2 = match($derivs1, $indent)) {
-        my($derivs3, $entry) = ns_l_block_map_entry($derivs2, $n) or last;
-        push @map, @{$entry};
-        $derivs1 = $derivs3;
-    }
-    return ($derivs1, ['ns-l-compact-mapping', @map]);
 }
 
 # [196] s-l+block-node(n,c)
@@ -808,7 +805,7 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memorized)
 
 =head1 VERSION
 
-0.004
+0.005
 
 =head1 SYNOPSIS
 

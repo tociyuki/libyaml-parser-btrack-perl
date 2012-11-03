@@ -1,5 +1,8 @@
 Revision history for YAML-Parser-Btrack
 
+0.005 Sat Nov  3 02:00:25 2012
+    * add function l_block_seq_entries and l_block_map_entries.
+
 0.004 Sat Nov  3 01:48:02 2012
     ! fix correct [\n] from [\\n] in ns_l_compact_sequence.
 
