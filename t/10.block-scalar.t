@@ -7,7 +7,7 @@ use YAML::Parser::Btrack;
 
 BEGIN { require 't/behaviour.pm' and Test::Behaviour->import }
 
-plan tests => 19;
+plan tests => 25;
 
 *derivs = \&YAML::Parser::Btrack::derivs;
 *match = \&YAML::Parser::Btrack::match;
@@ -256,6 +256,143 @@ sub strip {
                 ['c-l+literal',
                       qq(literal\n)
                     . qq(text\n), ],
+            ], spec;
+}
+
+{
+    describe 'Block Literal';
+
+    it 'should match clip chomped end';
+        my $s1all = derivs(
+              qq(literal: |\n)
+            . qq(  literal\n)
+            . qq(   text),
+        );
+        my $s1 = match($s1all, qq(literal: ));
+        my $s1end = match($s1,
+              qq(|\n)
+            . qq(  literal\n)
+            . qq(   text),
+        );
+        is_deeply [strip c_l__block_scalar($s1, 1)],
+            [
+                strip $s1end,
+                ['c-l+literal', qq(literal\n text)],
+            ], spec;
+
+    it 'should match keep chomped end';
+        my $s2all = derivs(
+              qq(literal: |+\n)
+            . qq(  literal\n)
+            . qq(   text),
+        );
+        my $s2 = match($s2all, qq(literal: ));
+        my $s2end = match($s2,
+              qq(|+\n)
+            . qq(  literal\n)
+            . qq(   text),
+        );
+        is_deeply [strip c_l__block_scalar($s2, 1)],
+            [
+                strip $s2end,
+                ['c-l+literal', qq(literal\n text)],
+            ], spec;
+
+    it 'should match strip chomped end';
+        my $s3all = derivs(
+              qq(literal: |-\n)
+            . qq(  literal\n)
+            . qq(   text),
+        );
+        my $s3 = match($s3all, qq(literal: ));
+        my $s3end = match($s3,
+              qq(|-\n)
+            . qq(  literal\n)
+            . qq(   text),
+        );
+        is_deeply [strip c_l__block_scalar($s3, 1)],
+            [
+                strip $s3end,
+                ['c-l+literal', qq(literal\n text)],
+            ], spec;
+
+
+    it 'should match clip chomped space end';
+        my $s4all = derivs(
+              qq(literal: |\n)
+            . qq(\n)
+            . qq(  literal\n)
+            . qq(\n)
+            . qq(   text\n)
+            . qq(\n)
+            . qq( ),
+        );
+        my $s4 = match($s4all, qq(literal: ));
+        my $s4end = match($s4,
+              qq(|\n)
+            . qq(\n)
+            . qq(  literal\n)
+            . qq(\n)
+            . qq(   text\n)
+            . qq(\n)
+            . qq( ),
+        );
+        is_deeply [strip c_l__block_scalar($s4, 1)],
+            [
+                strip $s4end,
+                ['c-l+literal', qq(\nliteral\n\n text\n)],
+            ], spec;
+
+    it 'should match keep chomped space end';
+        my $s5all = derivs(
+              qq(literal: |+\n)
+            . qq(\n)
+            . qq(  literal\n)
+            . qq(\n)
+            . qq(   text\n)
+            . qq(\n)
+            . qq( ),
+        );
+        my $s5 = match($s5all, qq(literal: ));
+        my $s5end = match($s5,
+              qq(|+\n)
+            . qq(\n)
+            . qq(  literal\n)
+            . qq(\n)
+            . qq(   text\n)
+            . qq(\n)
+            . qq( ),
+        );
+        is_deeply [strip c_l__block_scalar($s5, 1)],
+            [
+                strip $s5end,
+                ['c-l+literal', qq(\nliteral\n\n text\n\n)],
+            ], spec;
+
+    it 'should match strip chomped space end';
+        my $s6all = derivs(
+              qq(literal: |-\n)
+            . qq(\n)
+            . qq(  literal\n)
+            . qq(\n)
+            . qq(   text\n)
+            . qq(\n)
+            . qq( ),
+        );
+        my $s6 = match($s6all, qq(literal: ));
+        my $s6end = match($s6,
+              qq(|-\n)
+            . qq(\n)
+            . qq(  literal\n)
+            . qq(\n)
+            . qq(   text\n)
+            . qq(\n)
+            . qq( ),
+        );
+        is_deeply [strip c_l__block_scalar($s6, 1)],
+            [
+                strip $s6end,
+                ['c-l+literal', qq(\nliteral\n\n text)],
             ], spec;
 }
 

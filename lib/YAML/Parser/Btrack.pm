@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 use Exporter;
 
-our $VERSION = '0.005';
+our $VERSION = '0.006';
 # $Id$
 
 our @ISA = qw(Exporter);
@@ -580,18 +580,26 @@ sub c_l__block_scalar {
         $indentation = (length $w) >= $n ? (length $w) - $n : 0; 
     }
     $n += $indentation;
-    my($derivs2, $s) = match($derivs1, qr{
-        ((?:(?!(?:^---|^[.][.][.]))(?:[ ]{$n}[\p{Graph} \t]+\n|[ ]*\n))*) 
-    }msx) or return;
+    my($derivs2, $s) = match($derivs1, qr{(
+        (?:[ ]*\n)*
+        (?:(?!(?:^---|^[.][.][.]))[ ]{$n}[\p{Graph} \t]+
+            (?: \n
+                (?:(?!(?:^---|^[.][.][.]))[ ]{$n}[\p{Graph} \t]+|[ ]*))*)?
+        (?:\n|\z) 
+    )}msx) or return;
     my $derivs3 = s_l_comments($derivs2) || $derivs2;
     $n > 0 and $s =~ s/^[ ]{0,$n}//gmsx;
-    my $btrail = $s =~ s/(\n+)\z//msx ? $1 : q();
+    # b-chomped-last(t) and l-chomped-empty(n,t)
+    my $b_l_last = $s =~ s/(\n+)\z//msx ? $1 : q();
+    my $b_l_chomped = 
+        ! $chomp && $b_l_last ? "\n"
+        : $chomp eq q(+) ? $b_l_last
+        : q();
     if ($type eq 'c-l+folded') {
         $s =~ s{^([^ \t\n][^\n]*)\n(?=(\n*)[^ \t\n])}
                { $1 . ($2 ? q() : q( )) }egmsx;
     }
-    my $trail = (! $chomp ? "\n" : $chomp eq q(+) ? $btrail : q());
-    return ($derivs3, [$type, $s . $trail]);
+    return ($derivs3, [$type, $s . $b_l_chomped]);
 }
 
 # 8.2. Block Collection Styles
@@ -805,7 +813,7 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memorized)
 
 =head1 VERSION
 
-0.005
+0.006
 
 =head1 SYNOPSIS
 
