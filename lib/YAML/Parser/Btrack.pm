@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 use Exporter;
 
-our $VERSION = '0.007';
+our $VERSION = '0.008';
 # $Id$
 
 our @ISA = qw(Exporter);
@@ -49,8 +49,11 @@ sub match {
     }
     elsif (ref $phrase eq 'Regexp') {
         pos(${$derivs->[0]}) = $pos;
-        if (my @captures = ${$src} =~ m{\G$phrase}gcmsx) {
-            $#+ < 1 and @captures = (); # without captures in phrase
+        if (${$src} =~ m{\G$phrase}gcmsx) {
+            my @captures = map {
+                (defined $-[$_] && defined $+[$_])
+                ? (substr ${$src}, $-[$_], $+[$_] - $-[$_]) : undef;
+            } 1 .. $#-;
             my $derived = [$src, pos ${$src}, @v];
             return wantarray ? ($derived, @captures) : $derived;
         }
@@ -815,7 +818,7 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memorized)
 
 =head1 VERSION
 
-0.007
+0.008
 
 =head1 SYNOPSIS
 

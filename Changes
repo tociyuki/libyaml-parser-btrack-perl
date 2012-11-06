@@ -1,5 +1,8 @@
 Revision history for YAML-Parser-Btrack
 
+0.008 Tue Nov  6 12:18:24 2012
+    ! fix use correct match @captures logic.
+
 0.007 Tue Nov  6 09:26:05 2012
     ! fix unrecognize first block mapping entry with a property.
 
