@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 use Exporter;
 
-our $VERSION = '0.006';
+our $VERSION = '0.007';
 # $Id$
 
 our @ISA = qw(Exporter);
@@ -39,11 +39,11 @@ sub derivs {
 sub match {
     my($derivs, $phrase) = @_;
     ref $derivs eq 'ARRAY' or Carp::confess('not derivs');
-    my($src, $pos) = @{$derivs};
+    my($src, $pos, @v) = @{$derivs};
     if (! ref $phrase) {
         my $n = length $phrase;
         if ($phrase eq substr ${$src}, $pos, $n) {
-            my $derived = [$src, $pos + $n];
+            my $derived = [$src, $pos + $n, @v];
             return wantarray ? ($derived, $phrase) : $derived;
         }
     }
@@ -51,7 +51,7 @@ sub match {
         pos(${$derivs->[0]}) = $pos;
         if (my @captures = ${$src} =~ m{\G$phrase}gcmsx) {
             $#+ < 1 and @captures = (); # without captures in phrase
-            my $derived = [$src, pos ${$src}];
+            my $derived = [$src, pos ${$src}, @v];
             return wantarray ? ($derived, @captures) : $derived;
         }
     }
@@ -582,9 +582,9 @@ sub c_l__block_scalar {
     $n += $indentation;
     my($derivs2, $s) = match($derivs1, qr{(
         (?:[ ]*\n)*
-        (?:(?!(?:^---|^[.][.][.]))[ ]{$n}[\p{Graph} \t]+
+        (?: (?!(?:^---|^[.][.][.]))[ ]{$n}[\p{Graph} \t]+
             (?: \n
-                (?:(?!(?:^---|^[.][.][.]))[ ]{$n}[\p{Graph} \t]+|[ ]*))*)?
+                (?:(?!(?:^---|^[.][.][.]))[ ]{$n}[\p{Graph} \t]+|[ ]*) )* )?
         (?:\n|\z) 
     )}msx) or return;
     my $derivs3 = s_l_comments($derivs2) || $derivs2;
@@ -730,15 +730,17 @@ sub s_l__block_node {
         return ($derivs4, $prop ? [@{$prop}, $node] : $node);
     }
     RULE: {
-        my($derivs1, $prop, $derivs3, $node);
+        my($derivs1, $x, $prop, $derivs3, $node);
         $derivs
         and $derivs1 = s_separate($derivs, $n + 1, $c)
-        and ($derivs1, $prop) = c_ns_properties($derivs1, $n + 1, $c);
-        my $derivs2 = s_l_comments($derivs1 || $derivs) or last;
+        and ($derivs1, $x) = c_ns_properties($derivs1, $n + 1, $c)
+        and $derivs1 = s_l_comments($derivs1)
+        and $prop = $x
+        or  $derivs1 = s_l_comments($derivs) or last;
         my $n1 = $c eq 'block-out' ? $n - 1 : $n;
-        $derivs2 and (
-           ($derivs3, $node) = l__block_sequence($derivs2, $n1)
-        or ($derivs3, $node) = l__block_mapping($derivs2, $n) ) or last;
+        $derivs1 and (
+           ($derivs3, $node) = l__block_sequence($derivs1, $n1)
+        or ($derivs3, $node) = l__block_mapping($derivs1, $n) ) or last;
         return ($derivs3, $prop ? [@{$prop}, $node] : $node);
     }
     RULE: {
@@ -813,7 +815,7 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (not Memorized)
 
 =head1 VERSION
 
-0.006
+0.007
 
 =head1 SYNOPSIS
 

@@ -1,5 +1,8 @@
 Revision history for YAML-Parser-Btrack
 
+0.007 Tue Nov  6 09:26:05 2012
+    ! fix unrecognize first block mapping entry with a property.
+
 0.006 Sun Nov  4 01:49:30 2012
     ! fix c-l+literal and c-l+folded accept chomped end line.
 

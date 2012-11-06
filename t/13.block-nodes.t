@@ -7,7 +7,7 @@ use YAML::Parser::Btrack;
 
 BEGIN { require 't/behaviour.pm' and Test::Behaviour->import }
 
-plan tests => 4;
+plan tests => 7;
 
 *derivs = \&YAML::Parser::Btrack::derivs;
 *match = \&YAML::Parser::Btrack::match;
@@ -139,5 +139,71 @@ sub strip {
                 ['ns-plain', qq(Bare document)],
             ], spec;
             
+}
+
+{
+    it 'should match block mapping property and block key property.';
+
+        my $s1 = derivs(
+              qq(!!map\n)
+            . qq(  !!str : implicit entry\n)
+            . qq(...\n)
+        );
+        my $s1end = match($s1,
+              qq(!!map\n)
+            . qq(  !!str : implicit entry\n)
+        );
+
+        is_deeply [strip s_l__block_node($s1, -1, 'block-in')],
+            [
+                strip $s1end,
+                ['c-ns-properties', ['c-ns-tag-property', '!!map'], undef,
+                    ['l+block-mapping',
+                        ['c-ns-properties', ['c-ns-tag-property', '!!str'], undef,
+                            ['e-scalar'], ],
+                        ['ns-plain', 'implicit entry'], ], ],
+            ], spec
+
+    it 'should match block mapping property.';
+
+        my $s2 = derivs(
+              qq(!!map\n)
+            . qq(  implicit key : implicit entry\n)
+            . qq(...\n)
+        );
+        my $s2end = match($s2,
+              qq(!!map\n)
+            . qq(  implicit key : implicit entry\n)
+        );
+
+        is_deeply [strip s_l__block_node($s2, -1, 'block-in')],
+            [
+                strip $s2end,
+                ['c-ns-properties', ['c-ns-tag-property', '!!map'], undef,
+                    ['l+block-mapping',
+                        ['ns-plain', 'implicit key'],
+                        ['ns-plain', 'implicit entry'], ], ],
+            ], spec
+
+    it 'should match first block implicit key property.';
+
+        my $s3 = derivs(
+              qq(\n)
+            . qq(  !!str : implicit entry\n)
+            . qq(...\n)
+        );
+        my $s3end = match($s3,
+              qq(\n)
+            . qq(  !!str : implicit entry\n)
+        );
+
+        is_deeply [strip s_l__block_node($s3, -1, 'block-in')],
+            [
+                strip $s3end,
+                ['l+block-mapping',
+                    ['c-ns-properties', ['c-ns-tag-property', '!!str'], undef,
+                        ['e-scalar'], ],
+                    ['ns-plain', 'implicit entry'], ],
+            ], spec
 }
 
