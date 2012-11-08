@@ -30,26 +30,32 @@ sub strip {
 
     it 'should match start of line.';
 
-        is_deeply [strip s_separate_in_line(derivs($sep, 0))],
-            [strip derivs($sep, 0), q()], spec;
+        is_deeply [strip s_separate_in_line($sep)],
+            [strip $sep, ['s-separate-in-line']], spec;
 
     it 'should match pos==1 separator between "-" and "for".';
 
-        is_deeply [strip s_separate_in_line(derivs($sep, 1))],
-            [strip derivs($sep, 2), q( )], spec;
+        my $sep1 = match($sep, "-");
+        my $sep1end = match($sep1, " ");
+        is_deeply [strip s_separate_in_line($sep1)],
+            [strip $sep1end, ['s-separate-in-line']], spec;
 
     it 'should not match pos==2 on word "for".';
 
-        is_deeply [s_separate_in_line(derivs($sep, 2))], [], spec;
+        my $sep2 = match($sep, "- ");
+        is_deeply [s_separate_in_line($sep2)], [], spec;
 
     it 'should match pos==6 between ":" and "bar".';
 
-        is_deeply [strip s_separate_in_line(derivs($sep, 6))],
-            [strip derivs($sep, 8), "\t "], spec;
+        my $sep3 = match($sep, "- for:");
+        my $sep3end = match($sep3, "\t ");
+        is_deeply [strip s_separate_in_line($sep3)],
+            [strip $sep3end, ['s-separate-in-line']], spec;
 
     it 'should not match pos==11 at end of line.';
 
-        is_deeply [s_separate_in_line(derivs($sep, 11))], [], spec;
+        my $sep4 = match($sep, "- for:\t bar");
+        is_deeply [s_separate_in_line($sep4)], [], spec;
 }
 
 {
@@ -66,12 +72,12 @@ sub strip {
     it 'should match after colon.';
 
         is_deeply [strip s_b_comment($exam6_9comment)],
-            [strip $exam6_9bol, qq(    # Comment\n)], spec;
+            [strip $exam6_9bol, ['s_b_comment']], spec;
 
     it 'should match end of file.';
 
         is_deeply [strip s_b_comment($exam6_9eof)],
-            [strip $exam6_9eof, q()], spec;
+            [strip $exam6_9eof, ['s_b_comment']], spec;
 
     it 'should match end of line.';
 
@@ -80,7 +86,7 @@ sub strip {
         my $foo2bol = match($foo2eol, qq(\n));
 
         is_deeply [strip s_b_comment($foo2eol)],
-            [strip $foo2bol, qq(\n)], spec;
+            [strip $foo2bol, ['s_b_comment']], spec;
 
     it 'should match comment line.';
 
@@ -89,7 +95,7 @@ sub strip {
         my $foo3bol = match($foo3comment, qq(# comment \n));
 
         is_deeply [strip s_b_comment($foo3comment)],
-            [strip $foo3bol, qq(# comment \n)], spec;
+            [strip $foo3bol, ['s_b_comment']], spec;
 
     it 'should not match non-comment-sharp.';
 
@@ -105,7 +111,7 @@ sub strip {
         my $foo5eof = match($foo5comment, q( # comment));
         
         is_deeply [strip s_b_comment($foo5comment)],
-            [strip $foo5eof, q( # comment)], spec;
+            [strip $foo5eof, ['s_b_comment']], spec;
 
     it 'should match l-comment end file.';
 
@@ -114,7 +120,7 @@ sub strip {
         my $foo6eof = match($foo6comment, q(# comment));
         
         is_deeply [strip s_b_comment($foo6comment)],
-            [strip $foo6eof, q(# comment)], spec;
+            [strip $foo6eof, ['s_b_comment']], spec;
 }
 
 {
@@ -131,7 +137,7 @@ sub strip {
         my $exam6_10bol = match($exam6_10, qq(  # Comment\n   \n\n));
         
         is_deeply [strip s_l_comments($exam6_10)],
-            [strip $exam6_10bol, qq(  # Comment\n   \n\n)], spec;
+            [strip $exam6_10bol, ['s-l-comments'], 'n'], spec;
 
     it 'should match comment and line comments.';
 
@@ -140,14 +146,14 @@ sub strip {
         my $foo1bol = match($foo1comment, qq( # comment\n# comment \n\n));
         
         is_deeply [strip s_l_comments($foo1comment)],
-            [strip $foo1bol, qq( # comment\n# comment \n\n)], spec;
+            [strip $foo1bol, ['s-l-comments'], 'n'], spec;
 
     it 'should match line comments.';
 
         my $foo1comment2 = match($foo1, qq(- # comment\n));
         
         is_deeply [strip s_l_comments($foo1comment2)],
-            [strip $foo1bol, qq(# comment \n\n)], spec;
+            [strip $foo1bol, ['s-l-comments'], 'n'], spec;
 
     it 'should match blank line and comments.';
 
@@ -155,7 +161,7 @@ sub strip {
         my $foo2bol = match($foo2, qq(\n\n# comment\n# comment \n\n));
 
         is_deeply [strip s_l_comments($foo2)],
-            [strip $foo2bol, qq(\n\n# comment\n# comment \n\n)], spec;
+            [strip $foo2bol, ['s-l-comments'], 'n'], spec;
 
     it 'should match s-b-comment end file.';
 
@@ -166,17 +172,17 @@ sub strip {
         my $foo3eof = match($foo3, qq(- # comment\n# comment \n\n # foo));
 
         is_deeply [strip s_l_comments($foo3comment1)],
-            [strip $foo3eof, qq( # comment\n# comment \n\n # foo)], spec;
+            [strip $foo3eof, ['s-l-comments'],'n'], spec;
 
     it 'should match l-comment end file.';
 
         is_deeply [strip s_l_comments($foo3comment2)],
-            [strip $foo3eof, qq(# comment \n\n # foo)], spec;
+            [strip $foo3eof, ['s-l-comments'],'n'], spec;
 
     it 'should match comment end file.';
 
         is_deeply [strip s_l_comments($foo3comment3)],
-            [strip $foo3eof, qq( # foo)], spec;
+            [strip $foo3eof, ['s-l-comments'], 'w'], spec;
 }
 
 {
@@ -206,31 +212,31 @@ sub strip {
     it 'should match flow-key separate.';
      
         is_deeply [strip s_separate($e1s1, 0, 'flow-key')],
-            [strip $e1n1, q( )], spec;
+            [strip $e1n1, ['s-separate']], spec;
 
     it 'should match flow-in separate.';
      
         is_deeply [strip s_separate($e1s2, 0, 'flow-in')],
-            [strip $e1n2, q( )], spec;
+            [strip $e1n2, ['s-separate']], spec;
 
     it 'should match block-in separate begining a newline.';
 
-        is_deeply [strip s_separate($e1s3, -1, 'block-in')],
-            [strip $e1n3, qq(\n# Statistics:\n  )], spec;
+        is_deeply [strip s_separate($e1s3, 0, 'block-in')],
+            [strip $e1n3, ['s-separate']], spec;
 
     it 'should match block-in separate begining a white space.';
 
-        is_deeply [strip s_separate($e1s4, -1, 'block-in')],
-            [strip $e1n4, qq(  # Home runs\n     )], spec;
+        is_deeply [strip s_separate($e1s4, 0, 'block-in')],
+            [strip $e1n4, ['s-separate']], spec;
 
     it 'should match block-in separate begining a white space.';
 
-        is_deeply [strip s_separate($e1s5, -1, 'block-in')],
-            [strip $e1n5, qq(  )], spec;
+        is_deeply [strip s_separate($e1s5, 0, 'block-in')],
+            [strip $e1n5, ['s-separate']], spec;
 
     it 'should match block-in separate begining of line.';
 
-        is_deeply [strip s_separate($e1s6, -1, 'block-in')],
-            [strip $e1n6, qq(# Statistics:\n  )], spec;
+        is_deeply [strip s_separate($e1s6, 0, 'block-in')],
+            [strip $e1n6, ['s-separate']], spec;
 }
 

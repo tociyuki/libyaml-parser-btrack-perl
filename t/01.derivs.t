@@ -23,13 +23,13 @@ plan tests => 13;
 
         is ref $derivs, 'ARRAY', spec;
 
-    it 'should package scalar ref. and integer.';
+    it 'should package scalar ref., integer, and hash.';
 
-        is_deeply $derivs, [\$input, 0], spec;
+        is_deeply $derivs, [\$input, 0, {}], spec;
 
     it 'should pass input scalar ref.';
 
-        is_deeply derivs($derivs, 1), [$derivs->[0], 1], spec;
+        is_deeply derivs($derivs, 1), [$derivs->[0], 1, {}], spec;
 
     it 'should match regexp.';
 

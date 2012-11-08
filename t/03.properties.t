@@ -123,7 +123,7 @@ sub strip {
         my $tag1 = derivs(qq(!<tag:yaml.org,2002:str> foo :\n));
         my $tag1end = match($tag1, qq(!<tag:yaml.org,2002:str>));
     
-        is_deeply [strip c_ns_properties($tag1, -1, 'block-in')],
+        is_deeply [strip c_ns_properties($tag1, 0, 'block-in')],
             [
                 strip $tag1end,
                 ['c-ns-properties',
@@ -136,7 +136,7 @@ sub strip {
         my $tag2 = derivs(qq(!<!bar> baz\n));
         my $tag2end = match($tag2, qq(!<!bar>));
     
-        is_deeply [strip c_ns_properties($tag2, -1, 'block-in')], 
+        is_deeply [strip c_ns_properties($tag2, 0, 'block-in')], 
             [
                 strip $tag2end, 
                 ['c-ns-properties',
@@ -149,7 +149,7 @@ sub strip {
         my $tag3 = derivs(qq(!!str bar\n));
         my $tag3end = match($tag3, qq(!!str));
     
-        is_deeply [strip c_ns_properties($tag3, 0, 'flow-in')],
+        is_deeply [strip c_ns_properties($tag3, 1, 'flow-out')],
             [
                 strip $tag3end,
                 ['c-ns-properties',
@@ -162,7 +162,7 @@ sub strip {
         my $tag4 = derivs(qq(!e!tag%21 baz\n));
         my $tag4end = match($tag4, qq(!e!tag%21));
     
-        is_deeply [strip c_ns_properties($tag4, 0, 'flow-in')],
+        is_deeply [strip c_ns_properties($tag4, 1, 'flow-out')],
             [
                 strip $tag4end,
                 ['c-ns-properties',
@@ -175,7 +175,7 @@ sub strip {
         my $tag5 = derivs(qq(! 12\n));
         my $tag5end = match($tag5, qq(!));
     
-        is_deeply [strip c_ns_properties($tag5, 0, 'flow-in')],
+        is_deeply [strip c_ns_properties($tag5, 1, 'flow-out')],
             [
                 strip $tag5end,
                 ['c-ns-properties',
@@ -188,7 +188,7 @@ sub strip {
         my $anchor6 = derivs(qq(&anchor Value\n));
         my $anchor6end = match($anchor6, qq(&anchor));
     
-        is_deeply [strip c_ns_properties($anchor6, 0, 'flow-in')],
+        is_deeply [strip c_ns_properties($anchor6, 1, 'flow-out')],
             [
                 strip $anchor6end,
                 ['c-ns-properties',
@@ -201,7 +201,7 @@ sub strip {
         my $both7 = derivs(qq(!!str  &a1 "foo":\n));
         my $both7end = match($both7, qq(!!str  &a1));
 
-        is_deeply [strip c_ns_properties($both7, 0, 'flow-in')],
+        is_deeply [strip c_ns_properties($both7, 0, 'block-key')],
             [
                 strip $both7end,
                 ['c-ns-properties',
@@ -214,7 +214,7 @@ sub strip {
         my $both8 = derivs(qq(&a1  !!str "foo":\n));
         my $both8end = match($both8, qq(&a1  !!str));
         
-        is_deeply [strip c_ns_properties($both8, 0, 'flow-in')],
+        is_deeply [strip c_ns_properties($both8, 1, 'flow-in')],
             [
                 strip $both8end,
                 ['c-ns-properties',
