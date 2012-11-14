@@ -7,7 +7,7 @@ use YAML::Parser::Btrack;
 
 BEGIN { require 't/behaviour.pm' and Test::Behaviour->import }
 
-plan tests => 25;
+plan tests => 31;
 
 *derivs = \&YAML::Parser::Btrack::derivs;
 *match = \&YAML::Parser::Btrack::match;
@@ -206,7 +206,7 @@ sub strip {
             . qq(\n)
             . qq(# clip\n)
         );
-        is_deeply [strip c_l__block_scalar($s7, 0)],
+        is_deeply [strip c_l__block_scalar($s7, -1)],
             [
                 strip $s7end,
                 ['c-l+literal',
@@ -229,7 +229,7 @@ sub strip {
             . qq(literal\n)
             . qq(text\n)
         );
-        is_deeply [strip c_l__block_scalar($s8, 0)],
+        is_deeply [strip c_l__block_scalar($s8, -1)],
             [
                 strip $s8end,
                 ['c-l+literal',
@@ -250,7 +250,7 @@ sub strip {
             . qq(literal\n)
             . qq(text\n)
         );
-        is_deeply [strip c_l__block_scalar($s9, 0)],
+        is_deeply [strip c_l__block_scalar($s9, -1)],
             [
                 strip $s9end,
                 ['c-l+literal',
@@ -394,6 +394,67 @@ sub strip {
                 strip $s6end,
                 ['c-l+literal', qq(\nliteral\n\n text)],
             ], spec;
+
+    it 'should strip empty scalar.';
+
+        # Example 8.6. Empty Scalar Chomping
+        my $exam8_6 = derivs(
+              qq(strip: |-\n)
+            . qq(\n)
+            . qq(clip: |\n)
+            . qq(\n)
+            . qq(keep: |+\n)
+            . qq(\n)
+            . qq(...\n),
+        );
+        my $s7 = match($exam8_6,
+              qq(strip: )
+        );
+        my $s7end = match($s7,
+              qq(|-\n)
+            . qq(\n)
+        );
+        is_deeply [strip c_l__block_scalar($s7, 1)],
+            [
+                strip $s7end,
+                ['c-l+literal', q()],
+            ], spec;
+
+    it 'should clip empty scalar.';
+
+        my $s8 = match($exam8_6,
+              qq(strip: |-\n)
+            . qq(\n)
+            . qq(clip: )
+        );
+        my $s8end = match($s8,
+              qq(|\n)
+            . qq(\n),
+        );
+        is_deeply [strip c_l__block_scalar($s8, 1)],
+            [
+                strip $s8end,
+                ['c-l+literal', q()],
+            ], spec;
+
+    it 'should keep empty scalar.';
+
+        my $s9 = match($exam8_6,
+              qq(strip: |-\n)
+            . qq(\n)
+            . qq(clip: |\n)
+            . qq(\n)
+            . qq(keep: )
+        );
+        my $s9end = match($s9,
+              qq(|+\n)
+            . qq(\n)
+        );
+        is_deeply [strip c_l__block_scalar($s9, 1)],
+            [
+                strip $s9end,
+                ['c-l+literal', "\n"],
+            ], spec;
 }
 
 {
@@ -416,7 +477,7 @@ sub strip {
             . qq(\n)
             . qq(# comment\n)
         );
-        is_deeply [strip c_l__block_scalar($s1, 0)],
+        is_deeply [strip c_l__block_scalar($s1, -1)],
             [
                 strip $s1end,
                 ['c-l+folded', qq(folded text\n)],
@@ -461,7 +522,7 @@ sub strip {
             . qq(\n)
             . qq(# Comment\n)
         );
-        is_deeply [strip c_l__block_scalar($s2, 0)],
+        is_deeply [strip c_l__block_scalar($s2, -1)],
             [
                 strip $s2end,
                 ['c-l+folded',
@@ -493,7 +554,7 @@ sub strip {
             . qq(\n)
             . qq(# keep\n)
         );
-        is_deeply [strip c_l__block_scalar($s3, 0)],
+        is_deeply [strip c_l__block_scalar($s3, -1)],
             [
                 strip $s3end,
                 ['c-l+folded', qq(folded text\n\n)],
@@ -516,7 +577,7 @@ sub strip {
             . qq(\n)
             . qq(\n)
         );
-        is_deeply [strip c_l__block_scalar($s3a, 0)],
+        is_deeply [strip c_l__block_scalar($s3a, -1)],
             [
                 strip $s3aend,
                 ['c-l+folded', qq(folded text\n\n\n)],
@@ -545,7 +606,7 @@ sub strip {
             . qq(    # comment\n)
             . qq(\n)
         );
-        is_deeply [strip c_l__block_scalar($s3b, 0)],
+        is_deeply [strip c_l__block_scalar($s3b, -1)],
             [
                 strip $s3bend,
                 ['c-l+folded', qq(folded text\n\n)],
@@ -568,7 +629,7 @@ sub strip {
             . qq(\n)
             . qq(# strip\n)
         );
-        is_deeply [strip c_l__block_scalar($s4, 0)],
+        is_deeply [strip c_l__block_scalar($s4, -1)],
             [
                 strip $s4end,
                 ['c-l+folded', qq(folded text)],
@@ -577,7 +638,7 @@ sub strip {
     it 'should match indentation indicator.';
 
         my $s5 = derivs(
-              qq(>2\n)
+              qq(>3\n)
             . qq(   folded\n)
             . qq(  text\n)
             . qq(\n)
@@ -585,13 +646,13 @@ sub strip {
             . qq(---\n),
         );
         my $s5end = match($s5,
-              qq(>2\n)
+              qq(>3\n)
             . qq(   folded\n)
             . qq(  text\n)
             . qq(\n)
             . qq(# clip\n)
         );
-        is_deeply [strip c_l__block_scalar($s5, 0)],
+        is_deeply [strip c_l__block_scalar($s5, -1)],
             [
                 strip $s5end,
                 ['c-l+folded', qq( folded\ntext\n)],
@@ -600,7 +661,7 @@ sub strip {
     it 'should match indentation and chomping indicator.';
 
         my $s6 = derivs(
-              qq(>2-\n)
+              qq(>3-\n)
             . qq(   folded\n)
             . qq(  text\n)
             . qq(\n)
@@ -608,13 +669,13 @@ sub strip {
             . qq(---\n),
         );
         my $s6end = match($s6,
-              qq(>2-\n)
+              qq(>3-\n)
             . qq(   folded\n)
             . qq(  text\n)
             . qq(\n)
             . qq(# strip\n)
         );
-        is_deeply [strip c_l__block_scalar($s6, 0)],
+        is_deeply [strip c_l__block_scalar($s6, -1)],
             [
                 strip $s6end,
                 ['c-l+folded', qq( folded\ntext)],
@@ -623,7 +684,7 @@ sub strip {
     it 'should match chomping and indentation indicator.';
 
         my $s7 = derivs(
-              qq(>-2\n)
+              qq(>-3\n)
             . qq(   folded\n)
             . qq(  text\n)
             . qq(\n)
@@ -631,13 +692,13 @@ sub strip {
             . qq(---\n),
         );
         my $s7end = match($s7,
-              qq(>-2\n)
+              qq(>-3\n)
             . qq(   folded\n)
             . qq(  text\n)
             . qq(\n)
             . qq(# strip\n)
         );
-        is_deeply [strip c_l__block_scalar($s7, 0)],
+        is_deeply [strip c_l__block_scalar($s7, -1)],
             [
                 strip $s7end,
                 ['c-l+folded', qq( folded\ntext)],
@@ -664,12 +725,74 @@ sub strip {
             . qq(\n)
             . qq(# clip\n)
         );
-        is_deeply [strip c_l__block_scalar($s8, 0)],
+        is_deeply [strip c_l__block_scalar($s8, -1)],
             [
                 strip $s8end,
                 ['c-l+folded',
                       qq(# content\n)
                     . qq(folded text\n)],
             ], spec;
+
+    it 'should strip empty scalar.';
+
+        # Example 8.6. Empty Scalar Chomping
+        my $exam8_6 = derivs(
+              qq(strip: >-\n)
+            . qq(\n)
+            . qq(clip: >\n)
+            . qq(\n)
+            . qq(keep: >+\n)
+            . qq(\n)
+            . qq(...\n),
+        );
+        my $s9 = match($exam8_6,
+              qq(strip: )
+        );
+        my $s9end = match($s9,
+              qq(>-\n)
+            . qq(\n)
+        );
+        is_deeply [strip c_l__block_scalar($s9, 1)],
+            [
+                strip $s9end,
+                ['c-l+folded', q()],
+            ], spec;
+
+    it 'should clip empty scalar.';
+
+        my $s10 = match($exam8_6,
+              qq(strip: >-\n)
+            . qq(\n)
+            . qq(clip: )
+        );
+        my $s10end = match($s10,
+              qq(>\n)
+            . qq(\n),
+        );
+        is_deeply [strip c_l__block_scalar($s10, 1)],
+            [
+                strip $s10end,
+                ['c-l+folded', q()],
+            ], spec;
+
+    it 'should keep empty scalar.';
+
+        my $s11 = match($exam8_6,
+              qq(strip: >-\n)
+            . qq(\n)
+            . qq(clip: >\n)
+            . qq(\n)
+            . qq(keep: )
+        );
+        my $s11end = match($s11,
+              qq(>+\n)
+            . qq(\n)
+        );
+        is_deeply [strip c_l__block_scalar($s11, 1)],
+            [
+                strip $s11end,
+                ['c-l+folded', "\n"],
+            ], spec;
+
 }
 

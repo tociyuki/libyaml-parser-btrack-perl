@@ -1,5 +1,8 @@
 Revision history for YAML-Parser-Btrack
 
+0.01  Wed Nov 14 06:48:02 2012
+    ! fix c-l+literal and c-l+folded emtpy scalar chomping.
+
 0.009 Thu Nov  8 16:06:32 2012
     * Memorize parsed results for flow nodes and separators.
     * Delete the productions related to one-line context.

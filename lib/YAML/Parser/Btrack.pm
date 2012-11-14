@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 use Exporter;
 
-our $VERSION = '0.009';
+our $VERSION = '0.01';
 # $Id$
 
 our @ISA = qw(Exporter);
@@ -81,16 +81,14 @@ sub memorize {
     return wantarray ? @{$parsed} : $parsed->[0];
 }
 
-# YAML 1.2 Partially Backtrack Parser
+# YAML 1.2 Backtrack Parser
 #
 #   see http://www.yaml.org/spec/1.2/spec.html
 #
 # In current version, the parser memorizes parsed results of
 # flow nodes and separators. To get same results as many as
-# possible for productions, the flow nodes and separators
+# possible for productions, the flow nodes and the separators
 # are parsed only in the multi-line contexts, flow-in and flow-out.
-# The one-line contexts, block-key and flow-key, are parsed
-# in the flow-in context.
 #
 # [39] ns-uri-char
 my $URICHAR = qr{(?:%[[:xdigit:]]{2}|[0-9A-Za-z\-\#;/?:\@&=+\$,_.!~*'()\[\]])}msx;
@@ -573,7 +571,6 @@ my $BLOCK_SCALAR =
 
 sub c_l__block_scalar {
     my($derivs, $n) = @_;
-    $n = defined $n && $n >= 0 ? $n : 0;
     my($derivs1, @capture) = match($derivs, $BLOCK_SCALAR) or return;
     my $type = $capture[0] eq q(|) ? 'c-l+literal' : 'c-l+folded';
     my $indentation = defined $capture[1] ? $capture[1] : $capture[4];
@@ -581,29 +578,40 @@ sub c_l__block_scalar {
     if (! defined $indentation) {
         my(undef, $w) = match($derivs1, qr/(?:[ \t]*\n)*([ ]*)[^ \n]/omsx);
         $w ||= q();
-        $indentation = (length $w) >= $n ? (length $w) - $n : 0; 
+        $indentation = (length $w) - $n; 
     }
-    $n += $indentation;
-    my($derivs2, $s) = match($derivs1, qr{(
-        (?:[ ]*\n)*
-        (?: (?!(?:^---|^[.][.][.]))[ ]{$n}[\p{Graph} \t]+
-            (?: \n
-                (?:(?!(?:^---|^[.][.][.]))[ ]{$n}[\p{Graph} \t]+|[ ]*) )* )?
-        (?:\n|\z) 
-    )}msx) or return;
+    my $n1 = $n + $indentation;
+    # A block scalar may consists only of empty lines.
+    # see specification's 8.1.1.2. Block Chomping Indicator
+    my $lex = $n1 <= $n
+        ? qr/((?:[ \t]*\n)*)/msx
+        : qr{(
+            (?:[ ]*\n)*
+            (?: (?!(?:^---|^[.][.][.]))[ ]{$n1}[\p{Graph} \t]+
+                (?: \n
+                    (?:(?!(?:^---|^[.][.][.]))[ ]{$n1}[\p{Graph} \t]+|[ ]*) )* )?
+            (?:\n|\z) 
+          )}msx;
+    my($derivs2, $s) = match($derivs1, $lex) or return;
     my $derivs3 = s_l_comments($derivs2) || $derivs2;
-    $n > 0 and $s =~ s/^[ ]{0,$n}//gmsx;
+    $n1 > 0 and $s =~ s/^[ ]{0,$n1}//gmsx;
     # b-chomped-last(t) and l-chomped-empty(n,t)
-    my $b_l_last = $s =~ s/(\n+)\z//msx ? $1 : q();
-    my $b_l_chomped = 
-        ! $chomp && $b_l_last ? "\n"
-        : $chomp eq q(+) ? $b_l_last
+    my $b_chomped_last = q();
+    my $l_chomped_empty = $s =~ s/(\n+)\z//msx ? $1 : q();
+    if (length $s > 0 && length $l_chomped_empty > 0) {
+        $b_chomped_last = $chomp eq q(-) ? q() : "\n";
+        chop $l_chomped_empty;
+    }
+    my $l_chomped = 
+          ! $chomp ? $b_chomped_last
+        : $chomp eq q(+) ? $b_chomped_last . $l_chomped_empty
         : q();
     if ($type eq 'c-l+folded') {
+        $s =~ s{^[ \t]*$}{}gmsx;
         $s =~ s{^([^ \t\n][^\n]*)\n(?=(\n*)[^ \t\n])}
                { $1 . ($2 ? q() : q( )) }egmsx;
     }
-    return ($derivs3, [$type, $s . $b_l_chomped]);
+    return ($derivs3, [$type, $s . $l_chomped]);
 }
 
 # 8.2. Block Collection Styles
@@ -820,7 +828,7 @@ YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (Partially Memorized)
 
 =head1 VERSION
 
-0.009
+0.01
 
 =head1 SYNOPSIS
 
