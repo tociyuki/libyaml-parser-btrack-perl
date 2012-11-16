@@ -112,7 +112,7 @@ sub strip {
         );
         
         is_deeply [strip l_directive($tag1)], [strip $tag1end,
-              ['ns-tag-directive', 'FOO', 'bar', 'baz']], spec;
+              ['ns-reserved-directive', 'FOO', 'bar', 'baz']], spec;
 }
 
 {

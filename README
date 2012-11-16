@@ -1,8 +1,8 @@
-YAML-Parser-Btrack version 0.01
+YAML-Parser-Btrack version 0.011
 
 A backtrack parser of YAML 1.2 compliant partially memorize futures.
 This is the practical implementation to study the YAML 1.2 grammar.
-Highly experimetal.
+Highly experimental.
 Do not use in any productions.
 
 INSTALLATION

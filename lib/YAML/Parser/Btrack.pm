@@ -4,7 +4,7 @@ use warnings;
 use Carp;
 use Exporter;
 
-our $VERSION = '0.01';
+our $VERSION = '0.011';
 # $Id$
 
 our @ISA = qw(Exporter);
@@ -205,7 +205,7 @@ sub l_directive {
     RULE: {
         my($derivs2, $list) = match($derivs1, $NS_RESERVED_DIRECTIVE) or last;
         my($derivs3) = s_l_comments($derivs2) or return;
-        return ($derivs3, ['ns-tag-directive', split /[ \t]+/msx, $list]);
+        return ($derivs3, ['ns-reserved-directive', split /[ \t]+/msx, $list]);
     }
     return;
 }
@@ -824,11 +824,11 @@ __END__
 
 =head1 NAME
 
-YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser (Partially Memorized)
+YAML::Parser::Btrack - Pure Perl YAML 1.2 Backtrack Parser
 
 =head1 VERSION
 
-0.01
+0.011
 
 =head1 SYNOPSIS
 
@@ -871,9 +871,15 @@ $phrase is a $substr or a regexp.
 
 Returns $derivs when it is at end of file.
 
+=item C<< memorize($derivs, $key, \&yield) >>
+
 =item C<< s_separate_in_line($derivs) >>
 
 The production s-separate-in-line.
+
+=item C<< s_flow_line_prefix($derivs, $n) >>
+
+The production s-flow-line-prefix.
 
 =item C<< s_b_comment >>
 
@@ -896,10 +902,14 @@ This corresponds to white spaces in the YAML document.
 The production l-directive included s-l-comments.
 
     %YAML 1.2  # comment
+    %TAG !yaml! tag:yaml.org,2002:
+    %FOO foo bar baz
 
 to
 
     ['ns-yaml-directive', 'YAML', '1.2']
+    ['ns-tag-directive', 'TAG', '!yaml!', 'tag:yaml.org,2002:']
+    ['ns-reserved-directive', 'FOO', 'foo', 'bar', 'baz']
 
 =item C<< c_ns_properties >>
 
@@ -943,14 +953,6 @@ to
 
     ['c-double-quoted', 'string']
 
-=item C<< nb_double_one_line >>
-
-The production nb-double-one-line part of c-double-quoted.
-
-=item C<< nb_double_multi_line >>
-
-The production nb-double-multi-line part of c-double-quoted.
-
 =item C<< decode_double_text >>
 
 Decodes given double text.
@@ -968,14 +970,6 @@ to
 
     ['c-single-quoted', 'string']
 
-=item C<< nb_single_one_line >>
-
-The production nb-single-one-line part of c-single-quoted.
-
-=item C<< nb_single_multi_line >>
-
-The production nb-single-multi-line part of c-single-quoted.
-
 =item C<< decode_single_text >>
 
 Decodes given single text.
@@ -992,22 +986,6 @@ The texts are folded.
 to
 
     ['ns-plain', 'plain text']
-
-=item C<< ns_plain_one_line_out >>
-
-The production ns-plain-one-line(n,flow-out) part of ns-plain.
-
-=item C<< ns_plain_one_line_in >>
-
-The production ns-plain-one-line(n,flow-in) part of ns-plain.
-
-=item C<< ns_plain_multi_line_out >>
-
-The production ns-plain-multi-line(n,flow-out) part of ns-plain.
-
-=item C<< ns_plain_multi_line_in >>
-
-The production ns-plain-multi-line(n,flow-in) part of ns-plain.
 
 =item C<< decode_s_flow_folded >>
 
@@ -1142,6 +1120,10 @@ to
 
 The production ns-l-compact-sequence part of s-l+block-indented.
 
+=item C<< l_block_seq_entries >>
+
+The part of l+block-sequence and ns-l-compact-sequence.
+
 =item C<< s_l__block_indented >>
 
 The production s-l+block-indented
@@ -1175,6 +1157,10 @@ The production ns-l-block-map-entry part of l+block-mapping.
 =item C<< ns_l_compact_mapping >>
 
 The production ns-l-compact-mapping part of s-l+block-indented.
+
+=item C<< l_block_map_entries >>
+
+The part of l+block-mapping and ns-l-compact-mapping.
 
 =item C<< s_l__block_node >>
 
